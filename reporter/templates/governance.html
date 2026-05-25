@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>项目健康检查 · 战投工作台</title>
+<link rel="stylesheet" href="/static/governance.css">
+</head>
+<body>
+<div class="page">
+  <div class="masthead">
+    <div>
+      <div class="masthead-label">战投 · 数据治理</div>
+      <h1>项目健康检查</h1>
+      <div class="masthead-meta" id="mastheadMeta"></div>
+    </div>
+    <nav class="top-actions">
+      <a href="/" target="_blank" rel="noopener">工作台</a>
+      <a href="/dashboard" target="_blank" rel="noopener">看板</a>
+      <a href="/reporter" target="_blank" rel="noopener">生成器</a>
+    </nav>
+  </div>
+
+  <div class="metrics" id="metrics"></div>
+
+  <section class="section">
+    <div class="section-head">
+      <div>
+        <div class="section-label">问题类型分布</div>
+        <div class="section-sub" id="distributionSub"></div>
+      </div>
+      <button class="ghost-btn" id="refreshBtn">刷新检查</button>
+    </div>
+    <div class="type-grid" id="typeGrid"></div>
+  </section>
+
+  <section class="section">
+    <div class="section-head">
+      <div>
+        <div class="section-label" id="issueLabel">问题明细</div>
+        <div class="section-sub">只提示问题，不自动修改 Excel；单条和批量修正都调用既有项目编辑接口。</div>
+      </div>
+    </div>
+    <div class="toolbar">
+      <div class="search-wrap">
+        <span class="search-icon">⌕</span>
+        <input id="searchInput" type="text" placeholder="搜索项目 / 原因 / 建议">
+      </div>
+      <select id="typeFilter"><option value="">全部问题</option></select>
+      <select id="severityFilter"><option value="">全部级别</option></select>
+      <select id="fixableFilter">
+        <option value="">全部处理方式</option>
+        <option value="fixable">可直接修正</option>
+        <option value="review">需人工核对</option>
+      </select>
+      <select id="stateFilter">
+        <option value="active">仅未处理</option>
+        <option value="all">显示已处理</option>
+        <option value="handled">仅已处理</option>
+      </select>
+    </div>
+    <div class="bulk-bar" id="bulkBar">
+      <button class="ghost-btn" id="selectFixableBtn">选择当前可修正</button>
+      <span class="bulk-count" id="bulkCount">已选择 0 项</span>
+      <select id="bulkField">
+        <option value="owner">负责人</option>
+        <option value="priority">优先级</option>
+        <option value="status">状态</option>
+        <option value="score">项目打分</option>
+      </select>
+      <span id="bulkValueWrap"></span>
+      <button class="primary-btn" id="bulkApplyBtn">批量修正</button>
+      <button class="ghost-btn" id="clearSelectedBtn">清空选择</button>
+      <span class="bulk-status" id="bulkStatus"></span>
+    </div>
+    <div class="issue-table-shell">
+      <table class="issue-table">
+        <thead>
+          <tr>
+            <th style="width:42px;"></th>
+            <th style="width:120px;">问题类型</th>
+            <th style="width:160px;">项目</th>
+            <th style="width:176px;">字段状态</th>
+            <th style="width:96px;">最后活跃</th>
+            <th>原因</th>
+            <th>建议动作</th>
+            <th style="width:96px;">操作</th>
+          </tr>
+        </thead>
+        <tbody id="issueTbody"></tbody>
+      </table>
+    </div>
+    <div class="issue-cards" id="issueCards"></div>
+    <div id="emptyState" class="empty">当前筛选下没有问题</div>
+  </section>
+</div>
+
+<div class="modal-layer" id="editLayer" onclick="handleLayerClick(event)">
+  <div class="edit-modal">
+    <button class="modal-close" onclick="closeEdit()">×</button>
+    <div class="modal-label">人工确认修正</div>
+    <h2 id="editProjectName"></h2>
+    <p id="editReason"></p>
+    <div class="edit-field" id="editFieldWrap"></div>
+    <div class="modal-actions">
+      <button class="primary-btn" id="saveEditBtn">保存修正</button>
+      <button class="ghost-btn" onclick="closeEdit()">取消</button>
+      <span class="save-status" id="saveStatus"></span>
+    </div>
+  </div>
+</div>
+
+<script src="/static/governance.js"></script>
+</body>
+</html>

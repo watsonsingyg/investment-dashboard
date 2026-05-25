@@ -1,0 +1,6 @@
+flask
+httpx
+openpyxl
+anthropic
+pypdf
+python-docx

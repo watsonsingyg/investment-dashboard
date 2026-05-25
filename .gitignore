@@ -1,0 +1,39 @@
+# 数据备份
+backups/
+
+# 代码自动备份快照
+_codex_backup_*/
+
+# 环境变量（含 API Key）
+.env
+
+# 运行时日志
+logs/
+
+# 生成文件（每次从 Excel 动态生成）
+dashboard.html
+
+# 摘要缓存
+.summaries_cache.json
+
+# SQLite 影子库
+pipeline_shadow.db
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# 系统文件
+.DS_Store
+*.pid
+.server.pid
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# 桌面快捷方式
+战投工作台.app/

@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>战投工作台</title>
+<style>
+:root{
+  --bg:#faf9f7;--bg2:#f2f0eb;--bg3:#ffffff;
+  --border:rgba(0,0,0,.08);--border2:rgba(0,0,0,.14);
+  --text:#1a1a18;--text2:#5c5b55;--text3:#8e8d86;
+  --amber:#b87316;--amber-bg:#fef3e0;
+  --r:8px;--r2:12px
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Georgia','Noto Serif SC',serif;background:var(--bg);color:var(--text);min-height:100vh}
+.page{max-width:1180px;margin:0 auto;padding:48px 40px 80px}
+
+.masthead{border-bottom:1.5px solid var(--text);padding-bottom:20px;margin-bottom:48px}
+.masthead-label{font-family:'Courier New',monospace;font-size:10px;letter-spacing:.14em;
+  color:var(--text3);text-transform:uppercase;margin-bottom:8px}
+h1{font-size:28px;font-weight:normal;letter-spacing:-.5px}
+.masthead-meta{margin-top:8px;font-family:'Courier New',monospace;font-size:10px;color:var(--text3);
+  display:flex;gap:24px}
+
+.portal-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:18px}
+.portal-card{display:block;padding:36px 32px 52px;background:var(--bg3);
+  border:.5px solid var(--border2);border-radius:var(--r2);text-decoration:none;
+  color:var(--text);transition:border-color .18s,box-shadow .18s;position:relative;min-height:240px}
+.portal-card:hover{border-color:var(--text);box-shadow:0 4px 24px rgba(0,0,0,.06)}
+.card-tag{font-family:'Courier New',monospace;font-size:9px;letter-spacing:.16em;
+  color:var(--text3);text-transform:uppercase;margin-bottom:20px}
+.card-title{font-size:22px;font-weight:normal;margin-bottom:14px;letter-spacing:-.3px}
+.card-desc{font-size:13px;color:var(--text2);line-height:1.85}
+.card-stat{margin-top:16px;padding-top:14px;border-top:.5px solid var(--border);
+  font-family:'Courier New',monospace;font-size:10px;color:var(--text3);line-height:1.7}
+.card-arrow{position:absolute;bottom:26px;right:30px;
+  font-family:'Courier New',monospace;font-size:11px;letter-spacing:.06em;
+  color:var(--text3);transition:color .15s}
+.portal-card:hover .card-arrow{color:var(--text)}
+
+.logout{position:fixed;top:22px;right:32px;font-family:'Courier New',monospace;
+  font-size:10px;color:var(--text3);text-decoration:none;letter-spacing:.06em;
+  border-bottom:.5px solid transparent}
+.logout:hover{color:var(--text);border-color:var(--text3)}
+@media(max-width:1120px){.portal-grid{grid-template-columns:1fr 1fr}.page{max-width:920px}}
+@media(max-width:640px){.page{padding:38px 20px 64px}.portal-grid{grid-template-columns:1fr}.portal-card{min-height:210px}.masthead-meta{gap:12px}}
+</style>
+</head>
+<body>
+<a href="/logout" class="logout">退出 ×</a>
+<div class="page">
+
+<div class="masthead">
+  <div class="masthead-label">战投 · 投资管理平台</div>
+  <h1>工作台</h1>
+  <div class="masthead-meta">
+    <span>{{PROJECT_COUNT}} 个项目</span>
+    <span>看板更新：{{LAST_UPDATED}}</span>
+  </div>
+</div>
+
+<div class="portal-grid">
+
+  <a href="/dashboard" class="portal-card" target="_blank" rel="noopener">
+    <div class="card-tag">Pipeline Dashboard</div>
+    <div class="card-title">投资 Pipeline 看板</div>
+    <div class="card-desc">
+      全项目状态追踪与漏斗分析<br>
+      行业大类分布 · 本周活跃动态<br>
+      时间轴详情 · AI 进展摘要
+    </div>
+    <div class="card-stat">
+      {{PROJECT_COUNT}} 个项目 · 更新于 {{LAST_UPDATED}}
+    </div>
+    <div class="card-arrow">进入看板 →</div>
+  </a>
+
+  <a href="/reporter" class="portal-card" target="_blank" rel="noopener">
+    <div class="card-tag">Weekly Reporter</div>
+    <div class="card-title">周报生成器</div>
+    <div class="card-desc">
+      上传 BP / 会议纪要 / 财报<br>
+      AI 生成周报条目并推送至看板<br>
+      新项目入库 · 阶段状态更新
+    </div>
+    <div class="card-stat">
+      investment-taste &middot; yuhan-writing-style<br>
+      Model: {{GENERATION_MODEL}}
+    </div>
+    <div class="card-arrow">进入生成器 →</div>
+  </a>
+
+  <a href="/governance" class="portal-card" target="_blank" rel="noopener">
+    <div class="card-tag">Data Governance</div>
+    <div class="card-title">数据治理 / 健康检查</div>
+    <div class="card-desc">
+      缺负责人 / 缺优先级 / 缺状态<br>
+      长期无更新 · 异常周次 · 疑似重复<br>
+      问题筛选 · 人工确认后修正
+    </div>
+    <div class="card-stat">
+      使用现有 Excel 解析结果<br>
+      不自动改动数据源
+    </div>
+    <div class="card-arrow">进入检查 →</div>
+  </a>
+
+  <a href="/status" class="portal-card" target="_blank" rel="noopener">
+    <div class="card-tag">Runtime Status</div>
+    <div class="card-title">运行状态 / 日志</div>
+    <div class="card-desc">
+      当前 PID / 启动时间 / 运行时长<br>
+      模型配置 · Excel 修改时间<br>
+      服务日志尾部 · 排查启动问题
+    </div>
+    <div class="card-stat">
+      只读诊断页面<br>
+      不提供网页重启或杀进程
+    </div>
+    <div class="card-arrow">查看状态 →</div>
+  </a>
+
+</div>
+</div>
+</body>
+</html>
