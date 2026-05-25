@@ -23,7 +23,7 @@ if str(REPORT_DIR) not in sys.path:
 from reporter.ai_service import stream_weekly_generation
 from reporter.dashboard_api import load_dashboard_payload
 from reporter.dashboard_data import parse_excel
-from reporter.excel_store import find_excel, get_existing_week_content, get_project_row, get_projects, push_to_excel, update_project_fields
+from reporter.excel_store import ExcelLockError, find_excel, get_existing_week_content, get_project_row, get_projects, push_to_excel, update_project_fields
 from reporter.export_service import export_project_markdown, export_projects_csv, export_weekly_markdown
 from reporter.governance import load_governance_report, save_governance_issue_state
 from reporter.operation_log import log_operation, read_recent_operations
@@ -386,6 +386,8 @@ def api_project_patch(project):
             backup_path=result.get('backup_path', '')
         )
         return json_response(result)
+    except ExcelLockError as e:
+        return json_response({'error': str(e)}, 423)
     except KeyError as e:
         return json_response({'error': str(e)}, 404)
     except Exception as e:
@@ -520,6 +522,8 @@ def api_push():
 
     try:
         result = push_to_excel(REPORT_DIR, project, week, content, stage, category, biz_scope, score)
+    except ExcelLockError as e:
+        return json_response({'error': str(e)}, 423)
     except Exception as e:
         log_operation(REPORT_DIR, 'push_failed', project=project, week=week, error=str(e))
         return json_response({'error': f'写入 Excel 失败：{e}'}, 500)

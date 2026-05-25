@@ -1,7 +1,11 @@
 """Excel persistence helpers for the weekly report app."""
 
+import fcntl
+import os
 import re
 import shutil
+import time
+from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
 from urllib.parse import unquote
@@ -12,6 +16,32 @@ try:
     from .statuses import normalize_score, normalize_status, score_label
 except ImportError:
     from statuses import normalize_score, normalize_status, score_label
+
+
+class ExcelLockError(Exception):
+    """Excel 文件被其他操作占用时抛出。"""
+    pass
+
+
+@contextmanager
+def _lock_excel(report_dir, timeout=10):
+    """获取 Excel 文件的排他锁，超时抛出 ExcelLockError。"""
+    lock_path = Path(report_dir) / '.excel.lock'
+    fd = os.open(str(lock_path), os.O_CREAT | os.O_RDWR)
+    try:
+        start = time.monotonic()
+        while True:
+            try:
+                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except (BlockingIOError, OSError):
+                if time.monotonic() - start > timeout:
+                    raise ExcelLockError('Excel 文件正被其他操作占用，请稍后重试')
+                time.sleep(0.1)
+        yield
+    finally:
+        fcntl.flock(fd, fcntl.LOCK_UN)
+        os.close(fd)
 
 
 SCORE_HEADER = '项目打分'
@@ -153,45 +183,46 @@ def update_project_fields(report_dir, project: str, fields: dict) -> dict:
     if not clean_fields:
         return {'ok': True, 'project': project, 'changes': [], 'backup_path': ''}
 
-    backup_path = backup_workbook(report_dir)
-    path = find_excel(report_dir)
-    wb = openpyxl.load_workbook(path)
-    ws = wb.active
-    proj_row = None
-    for r in range(2, ws.max_row + 1):
-        value = ws.cell(r, 3).value
-        if value and str(value).strip() == project:
-            proj_row = r
-            break
-    if proj_row is None:
+    with _lock_excel(report_dir):
+        backup_path = backup_workbook(report_dir)
+        path = find_excel(report_dir)
+        wb = openpyxl.load_workbook(path)
+        ws = wb.active
+        proj_row = None
+        for r in range(2, ws.max_row + 1):
+            value = ws.cell(r, 3).value
+            if value and str(value).strip() == project:
+                proj_row = r
+                break
+        if proj_row is None:
+            wb.close()
+            raise KeyError(f'未找到项目：{project}')
+
+        if clean_fields.get('score') or (has_score_column(ws) and 'score' in clean_fields):
+            ensure_score_column(ws)
+
+        allowed = {
+            'biz_scope': 4,
+            'industry': 5,
+            'owner': 6,
+            'status': 7,
+            'priority': 8,
+        }
+        if has_score_column(ws):
+            allowed['score'] = SCORE_COL
+
+        changes = []
+        for field, col in allowed.items():
+            if field not in clean_fields:
+                continue
+            old = str(ws.cell(proj_row, col).value or '').strip()
+            new = normalize_score(clean_fields[field]) if field == 'score' else clean_fields[field]
+            old = normalize_score(old) if field == 'score' else old
+            if old != new:
+                ws.cell(proj_row, col).value = new
+                changes.append({'field': field, 'old': old, 'new': new})
+        wb.save(path)
         wb.close()
-        raise KeyError(f'未找到项目：{project}')
-
-    if clean_fields.get('score') or (has_score_column(ws) and 'score' in clean_fields):
-        ensure_score_column(ws)
-
-    allowed = {
-        'biz_scope': 4,
-        'industry': 5,
-        'owner': 6,
-        'status': 7,
-        'priority': 8,
-    }
-    if has_score_column(ws):
-        allowed['score'] = SCORE_COL
-
-    changes = []
-    for field, col in allowed.items():
-        if field not in clean_fields:
-            continue
-        old = str(ws.cell(proj_row, col).value or '').strip()
-        new = normalize_score(clean_fields[field]) if field == 'score' else clean_fields[field]
-        old = normalize_score(old) if field == 'score' else old
-        if old != new:
-            ws.cell(proj_row, col).value = new
-            changes.append({'field': field, 'old': old, 'new': new})
-    wb.save(path)
-    wb.close()
     return {
         'ok': True,
         'project': project,
@@ -201,7 +232,7 @@ def update_project_fields(report_dir, project: str, fields: dict) -> dict:
     }
 
 
-def backup_workbook(report_dir) -> Path:
+def backup_workbook(report_dir, max_backups=30) -> Path:
     src = find_excel(report_dir)
     backup_dir = Path(report_dir) / 'backups'
     backup_dir.mkdir(exist_ok=True)
@@ -210,6 +241,16 @@ def backup_workbook(report_dir) -> Path:
     ts = datetime.now().strftime('%Y%m%d_%H%M%S')
     dst = backup_dir / f'{stem}__{ts}{suffix}'
     shutil.copy2(src, dst)
+
+    # 轮转清理：保留最近 max_backups 个备份，删除更旧的
+    backups = sorted(
+        backup_dir.glob(f'{stem}__*{suffix}'),
+        key=lambda p: p.stat().st_mtime,
+        reverse=True,
+    )
+    for old in backups[max_backups:]:
+        old.unlink()
+
     return dst
 
 
@@ -219,56 +260,57 @@ def push_to_excel(report_dir, project: str, week: str, content: str,
     """写入周报内容，同时更新项目状态/类别。新项目自动追加行。
     列映射（1-indexed）：3=项目名, 4=业务范畴, 5=细分行业, 7=项目状态, 8=优先级, 9=项目打分, 10+=周报列
     """
-    backup_path = backup_workbook(report_dir)
-    path = find_excel(report_dir)
-    wb = openpyxl.load_workbook(path)
-    ws = wb.active
-    score = normalize_score(score)
-    if score:
-        ensure_score_column(ws)
+    with _lock_excel(report_dir):
+        backup_path = backup_workbook(report_dir)
+        path = find_excel(report_dir)
+        wb = openpyxl.load_workbook(path)
+        ws = wb.active
+        score = normalize_score(score)
+        if score:
+            ensure_score_column(ws)
 
-    proj_row = None
-    for r in range(2, ws.max_row + 1):
-        if ws.cell(r, 3).value and str(ws.cell(r, 3).value).strip() == project:
-            proj_row = r
-            break
+        proj_row = None
+        for r in range(2, ws.max_row + 1):
+            if ws.cell(r, 3).value and str(ws.cell(r, 3).value).strip() == project:
+                proj_row = r
+                break
 
-    is_new = proj_row is None
-    if is_new:
-        proj_row = ws.max_row + 1
-        ws.cell(proj_row, 3).value = project
+        is_new = proj_row is None
+        if is_new:
+            proj_row = ws.max_row + 1
+            ws.cell(proj_row, 3).value = project
 
-    if biz_scope:
-        ws.cell(proj_row, 4).value = biz_scope
-    if category:
-        ws.cell(proj_row, 5).value = category
-    if stage:
-        ws.cell(proj_row, 7).value = stage
-    old_score = normalize_score(ws.cell(proj_row, SCORE_COL).value) if has_score_column(ws) else ''
-    if score:
-        ws.cell(proj_row, SCORE_COL).value = score
+        if biz_scope:
+            ws.cell(proj_row, 4).value = biz_scope
+        if category:
+            ws.cell(proj_row, 5).value = category
+        if stage:
+            ws.cell(proj_row, 7).value = stage
+        old_score = normalize_score(ws.cell(proj_row, SCORE_COL).value) if has_score_column(ws) else ''
+        if score:
+            ws.cell(proj_row, SCORE_COL).value = score
 
-    week_col = None
-    week_start = first_week_col(ws)
-    for c in range(week_start, ws.max_column + 1):
-        hdr = ws.cell(1, c).value
-        if hdr and str(hdr).strip() == week:
-            week_col = c
-            break
-    if week_col is None:
-        ws.insert_cols(week_start)
-        ws.cell(1, week_start).value = week
-        week_col = week_start
+        week_col = None
+        week_start = first_week_col(ws)
+        for c in range(week_start, ws.max_column + 1):
+            hdr = ws.cell(1, c).value
+            if hdr and str(hdr).strip() == week:
+                week_col = c
+                break
+        if week_col is None:
+            ws.insert_cols(week_start)
+            ws.cell(1, week_start).value = week
+            week_col = week_start
 
-    old_content = ''
-    if week_col:
-        current = ws.cell(proj_row, week_col).value
-        old_content = str(current).strip() if current is not None else ''
+        old_content = ''
+        if week_col:
+            current = ws.cell(proj_row, week_col).value
+            old_content = str(current).strip() if current is not None else ''
 
-    if content:
-        ws.cell(proj_row, week_col).value = content
-    wb.save(path)
-    wb.close()
+        if content:
+            ws.cell(proj_row, week_col).value = content
+        wb.save(path)
+        wb.close()
     return {
         'ok': True,
         'row': proj_row,

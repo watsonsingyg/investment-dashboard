@@ -31,7 +31,7 @@ def main():
     excel = find_excel(ROOT)
     data = parse_excel(str(excel))
     check(len(data['projects']) == 73, '项目数为 73')
-    check(data['latest_week'] == '2026/05/18-2026/05/22', '最新周正确')
+    check(data['latest_week'] == '2026/05/25-2026/05/29', '最新周正确')
     check(data['oldest_week'] != '2/28 本周工作要点', '脏周列表头已排除')
     check(data['oldest_week'] == '2023/10/16-2023/10/20', '最早周为有效日期区间')
     governance = load_governance_report(ROOT)
