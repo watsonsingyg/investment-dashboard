@@ -29,6 +29,9 @@ __pycache__/
 *.pid
 .server.pid
 
+# Excel 文件锁（运行时生成）
+.excel.lock
+
 # IDE
 .idea/
 .vscode/
