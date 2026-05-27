@@ -46,9 +46,9 @@ fi
 
 # ── 运行数据库迁移 ──────────────────────────────────────────────────
 echo "📦 运行数据库迁移..."
-python3 -m alembic upgrade head || {
-    echo "⚠️  迁移失败（可能是全新数据库），使用 create_all 兜底..."
-    python3 -c "from models.base import init_db; init_db(); print('✅ 表创建完成')"
+python3 -m alembic upgrade head 2>/dev/null || {
+    echo "⚠️  迁移失败（可能是全新数据库或已有表），使用 create_all 兜底..."
+    python3 -c "from models.base import init_db; init_db(); print('✅ 表创建完成')" 2>/dev/null || echo "⚠️  create_all 也失败，继续启动..."
 }
 
 # ── 启动应用 ────────────────────────────────────────────────────────

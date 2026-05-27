@@ -6,12 +6,15 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
+# 强制重新构建（Railway Docker 缓存）
+ARG CACHEBUST=2
+
 # 安装运行时依赖（libpq5 用于 PostgreSQL）
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq5 && \
     rm -rf /var/lib/apt/lists/*
 
-# 复制依赖并安装（限制并发 worker 减少内存占用）
+# 复制依赖并安装
 COPY requirements.txt .
 RUN pip install --no-cache-dir --prefer-binary -r requirements.txt
 

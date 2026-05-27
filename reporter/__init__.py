@@ -83,28 +83,31 @@ def create_app() -> Flask:
     app.register_blueprint(settings_bp)
     app.register_blueprint(admin_bp)
 
-    # ── Swagger API 文档 ────────────────────────────────────────────────
-    from flasgger import Swagger
-    Swagger(app, config={
-        "headers": [],
-        "specs": [{
-            "endpoint": "apispec",
-            "route": "/apispec.json",
-        }],
-        "static_url_path": "/flasgger_static",
-        "swagger_ui": True,
-        "specs_route": "/api/docs/",
-        "title": "Pipeline SaaS API",
-        "description": "投资 Pipeline 管理系统 — REST API 文档",
-        "version": "1.0.0",
-        "securityDefinitions": {
-            "Bearer": {
-                "type": "apiKey",
-                "name": "Authorization",
-                "in": "header",
-                "description": "JWT token: Bearer &lt;token&gt;"
-            }
-        },
-    })
+    # ── Swagger API 文档（可选）────────────────────────────────────────
+    try:
+        from flasgger import Swagger
+        Swagger(app, config={
+            "headers": [],
+            "specs": [{
+                "endpoint": "apispec",
+                "route": "/apispec.json",
+            }],
+            "static_url_path": "/flasgger_static",
+            "swagger_ui": True,
+            "specs_route": "/api/docs/",
+            "title": "Pipeline SaaS API",
+            "description": "投资 Pipeline 管理系统 — REST API 文档",
+            "version": "1.0.0",
+            "securityDefinitions": {
+                "Bearer": {
+                    "type": "apiKey",
+                    "name": "Authorization",
+                    "in": "header",
+                    "description": "JWT token: Bearer <token>"
+                }
+            },
+        })
+    except ImportError:
+        app.logger.info("flasgger not installed, skipping Swagger docs")
 
     return app
