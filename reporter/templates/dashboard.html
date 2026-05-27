@@ -1,0 +1,120 @@
+{% extends "_base.html" %}
+{% block title %}Pipeline · 看板{% endblock %}
+{% block extra_css %}
+<link rel="stylesheet" href="/static/dashboard.css">
+{% endblock %}
+
+{% block content %}
+<div class="page">
+  <div class="page-header">
+    <div class="page-header-label">Pipeline Dashboard · 投资看板</div>
+    <h1>投资 Pipeline 看板</h1>
+    <div class="page-header-meta" id="mastheadMeta"></div>
+  </div>
+
+  <!-- 指标卡片 -->
+  <div class="metrics" id="metrics"></div>
+
+  <!-- 图表区 -->
+  <div class="db-section">
+    <div class="db-section-label">Pipeline 概览</div>
+    <div class="db-charts-row">
+      <div class="db-chart-card">
+        <div class="db-chart-title">创新 / AI 占比</div>
+        <div class="db-chart-canvas"><canvas id="donutChart" height="180"></canvas></div>
+        <div class="db-chart-legend" id="donutLegend"></div>
+      </div>
+      <div class="db-chart-card">
+        <div class="db-chart-title">阶段漏斗</div>
+        <div class="db-chart-canvas" id="funnelSvg"></div>
+        <div class="db-chart-footer" id="funnelFooter"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 评分分布 -->
+  <div class="db-section">
+    <div class="db-section-label">项目评分分布</div>
+    <div class="score-dist" id="scoreDist"></div>
+  </div>
+
+  <!-- 本周动态 -->
+  <div class="db-section">
+    <div class="db-section-label" id="activityLabel">本周动态</div>
+    <div class="activity-grid" id="activityGrid"></div>
+  </div>
+
+  <!-- 行业分布 -->
+  <div class="db-section">
+    <div class="db-section-label">行业分布</div>
+    <div class="category-list" id="categoryList"></div>
+  </div>
+
+  <!-- 投资逻辑 -->
+  <div class="db-section">
+    <div class="db-section-label">CVC 投资过滤器</div>
+    <div class="logic-grid" id="logicGrid"></div>
+  </div>
+
+  <!-- 洞察 -->
+  <div class="db-section">
+    <div class="db-section-label">数据洞察</div>
+    <div class="insight-grid" id="insights"></div>
+  </div>
+
+  <!-- 全项目追踪表格 -->
+  <div class="db-section">
+    <div class="tbl-toolbar">
+      <div class="tbl-label" id="tableLabel">全项目追踪</div>
+      <div class="tbl-search">
+        <input type="text" id="searchInput" placeholder="搜索项目…">
+      </div>
+      <div class="tbl-filters">
+        <select id="statusFilter"><option value="">全部状态</option></select>
+        <select id="priorityFilter"><option value="">全部优先级</option></select>
+        <select id="aiFilter"><option value="">全部类型</option><option value="创新/AI">创新/AI</option><option value="传统">传统</option></select>
+        <select id="categoryFilter"><option value="">全部范畴</option></select>
+      </div>
+      <div class="tbl-export">
+        <a href="/api/export/projects.csv" id="exportCsv" class="export-link">导出 CSV</a>
+        <a href="" id="exportWeekly" class="export-link">导出本周 MD</a>
+      </div>
+    </div>
+    <div class="table-shell">
+      <table class="data-table" id="projTable">
+        <thead>
+          <tr>
+            <th class="sortable" onclick="toggleSort('name')">项目名称 <span class="sort-arrow" id="arrow-name"></span></th>
+            <th class="sortable" onclick="toggleSort('category')">业务范畴 <span class="sort-arrow" id="arrow-category"></span></th>
+            <th class="sortable" onclick="toggleSort('industry')">细分行业 <span class="sort-arrow" id="arrow-industry"></span></th>
+            <th class="sortable" onclick="toggleSort('status')">状态 <span class="sort-arrow" id="arrow-status"></span></th>
+            <th class="sortable" onclick="toggleSort('priority')">优先级 <span class="sort-arrow" id="arrow-priority"></span></th>
+            <th class="sortable" onclick="toggleSort('score_label')">打分 <span class="sort-arrow" id="arrow-score_label"></span></th>
+            <th>最新进展</th>
+            <th class="sortable" onclick="toggleSort('last_active')">最后更新 <span class="sort-arrow" id="arrow-last_active"></span></th>
+          </tr>
+        </thead>
+        <tbody id="projTbody"></tbody>
+      </table>
+    </div>
+    <div class="empty" id="noResult" style="display:none">没有匹配的项目</div>
+  </div>
+</div>
+
+<!-- 项目详情弹窗 -->
+<div class="modal-overlay" id="modal-overlay" onclick="handleOverlayClick(event)">
+  <div class="modal-box detail-modal">
+    <button class="modal-close" onclick="closeDetail()">✕</button>
+    <div class="detail-header">
+      <h2 id="dp-name"></h2>
+      <div class="detail-badges" id="dp-badges"></div>
+    </div>
+    <div id="dp-body"></div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="/static/dashboard.js"></script>
+{% endblock %}
