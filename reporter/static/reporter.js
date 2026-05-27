@@ -613,8 +613,6 @@ async function startGen() {
 function cancelGen() {
   if (abortController) abortController.abort();
 }
-  }
-}
 
 // ── 复制 ──────────────────────────────────────────────────────────────────────
 function copyOut() {
