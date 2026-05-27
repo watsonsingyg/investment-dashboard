@@ -36,8 +36,6 @@ def _load_skill(path: Path) -> str:
 
 _SYSTEM_PROMPT = ""
 if settings.SKILL_ROOT and settings.SKILL_ROOT.exists():
-    from config import settings as s
-
     it_path = settings.SKILL_ROOT / "【Skill】investment taste/语涵的investment-taste.skill"
     ws_path = settings.SKILL_ROOT / "【Skill】yuhan writing style/yuhan-writing-style.skill"
     skill_it = _load_skill(it_path) if it_path.exists() else ""

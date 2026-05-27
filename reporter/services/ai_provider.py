@@ -192,6 +192,22 @@ def get_provider(db_session=None) -> AbstractAIChatProvider:
         return DeepSeekProvider(api_key, base_url or None)
 
 
+def get_ai_model(db_session=None) -> str:
+    """
+    从 DB 或环境变量获取当前配置的 model 名称。
+    供 ai_service.py 调用，确保 stream_chat 使用正确的 model。
+    """
+    # 1. 尝试 DB
+    if db_session is not None:
+        config = db_session.query(AIConfig).filter_by(id=1).first()
+        if config and config.is_configured and config.model:
+            return config.model
+    # 2. 回退到环境变量
+    if settings.DEEPSEEK_API_KEY:
+        return settings.DEEPSEEK_MODEL
+    return settings.DEEPSEEK_MODEL  # 默认
+
+
 def test_provider_connection(db_session=None) -> dict:
     """测试 AI 供应商连接。"""
     try:

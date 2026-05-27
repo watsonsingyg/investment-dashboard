@@ -84,13 +84,16 @@ def stream_weekly_generation(project: str, week: str, extra: str, category: str,
                              biz_scope: str, stage: str, progress: str, file_data,
                              system_prompt: str, db_session=None):
     """Yield SSE-ready payload strings for the weekly-report generation endpoint."""
-    from reporter.services.ai_provider import get_provider
+    from reporter.services.ai_provider import get_provider, get_ai_model
 
     try:
         provider = get_provider(db_session)
     except ValueError as e:
         yield f'data: {json.dumps({"error": str(e)})}\n\n'
         return
+
+    # 获取当前配置的 model
+    ai_model = get_ai_model(db_session)
 
     file_blocks = []
     for filename, content in file_data:
@@ -124,5 +127,5 @@ def stream_weekly_generation(project: str, week: str, extra: str, category: str,
         parts.append('\n--- 上传材料 ---\n' + '\n\n'.join(file_blocks))
     user_msg = '\n'.join(parts)
 
-    for chunk in provider.stream_chat(system_prompt, user_msg, ""):
+    for chunk in provider.stream_chat(system_prompt, user_msg, ai_model):
         yield chunk
