@@ -28,7 +28,7 @@ def create_app() -> Flask:
     # 生产环境建议明确指定允许的域名
     CORS(app, 
          supports_credentials=True,  # 允许携带 cookie/token
-         resources={r"/api/*": {"origins": "*"}},  # 允许所有来源访问 API
+         origins="*",  # 允许所有来源访问
          allow_headers=["Content-Type", "Authorization"],
          methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"])
 
