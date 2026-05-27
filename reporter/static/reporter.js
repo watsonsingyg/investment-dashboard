@@ -463,11 +463,43 @@ function renderFiles() {
       <button class="file-rm" onclick="rmFile(${JSON.stringify(f.name)})">✕</button>
     </div>`).join('');
 }
-const dz = document.getElementById('dropZone');
-dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('over'); });
-dz.addEventListener('dragleave', () => dz.classList.remove('over'));
-dz.addEventListener('drop', e => {
-  e.preventDefault(); dz.classList.remove('over'); onFileSelect(e.dataTransfer.files);
+// ── 文件上传（包裹在 DOMContentLoaded 中，防止脚本加载时 DOM 未就绪）──────────────────────────────────
+let files = [];
+function onFileSelect(fl) {
+  for (const f of fl) if (!files.find(x => x.name === f.name)) files.push(f);
+  renderFiles();
+}
+function rmFile(n) { files = files.filter(f => f.name !== n); renderFiles(); }
+function formatSize(bytes) {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024*1024) return (bytes/1024).toFixed(1) + ' KB';
+  return (bytes/(1024*1024)).toFixed(1) + ' MB';
+}
+function fileIcon(name) {
+  const ext = (name||'').split('.').pop().toLowerCase();
+  const icons = {pdf:'PDF',docx:'DOC',xlsx:'XLS',csv:'CSV',md:'MD',txt:'TXT'};
+  return icons[ext] || 'FILE';
+}
+function renderFiles() {
+  const fl = document.getElementById('fileList');
+  if (!fl) return;
+  fl.innerHTML = files.map(f =>
+    `<div class="file-row">
+      <span class="file-type-badge">${fileIcon(f.name)}</span>
+      <span class="file-name">${esc(f.name)}</span>
+      <span class="file-size">${formatSize(f.size)}</span>
+      <button class="file-rm" onclick="rmFile(${JSON.stringify(f.name)})">✕</button>
+    </div>`).join('');
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  const dz = document.getElementById('dropZone');
+  if (!dz) return;
+  dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('over'); });
+  dz.addEventListener('dragleave', () => dz.classList.remove('over'));
+  dz.addEventListener('drop', e => {
+    e.preventDefault(); dz.classList.remove('over'); onFileSelect(e.dataTransfer.files);
+  });
 });
 
 // ── 生成 ──────────────────────────────────────────────────────────────────────
