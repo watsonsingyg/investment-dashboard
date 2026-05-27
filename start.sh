@@ -1,10 +1,10 @@
 #!/bin/bash
-# 战投工作台 — 统一启动入口
+# 投资 Pipeline 管理系统 — 统一启动入口
 # 用法：
 #   bash start.sh                    # 前台启动，日志同步写入 logs/server.log
-#   bash start.sh --background --open # 后台启动并打开浏览器，供桌面 app 调用
-#   bash start.sh --status           # 查看当前 8766 上的工作台服务状态
-#   bash start.sh --restart          # 停止并重启已确认的工作台服务
+#   bash start.sh --background --open # 后台启动并打开浏览器
+#   bash start.sh --status           # 查看当前 8766 上的服务状态
+#   bash start.sh --restart          # 停止并重启已确认的服务
 
 set -euo pipefail
 cd "$(dirname "$0")"
@@ -220,11 +220,11 @@ if [ -n "$CURRENT_PIDS" ]; then
   fi
 fi
 
-echo "启动战投工作台：${BASE_URL}"
+echo "启动投资 Pipeline 管理系统：${BASE_URL}"
 echo "日志文件：${PWD}/${LOG_FILE}"
 echo "---- $(date '+%Y-%m-%d %H:%M:%S') start ----" >> "$LOG_FILE"
 
-python3 -u reporter/app.py >> "$LOG_FILE" 2>&1 &
+python3 -u server.py >> "$LOG_FILE" 2>&1 &
 APP_PID=$!
 echo "$APP_PID" > "$PID_FILE"
 

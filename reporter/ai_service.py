@@ -2,16 +2,23 @@
 
 import io
 import json
-import os
+import sys
 from pathlib import Path
 
 import httpx
 import openpyxl
 
+# 确保项目根目录在 sys.path 中
+_PROJECT_ROOT = str(Path(__file__).parent.parent)
+if _PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, _PROJECT_ROOT)
+
+from config import settings  # noqa: E402
+
 
 def search_company(project: str, category: str = '') -> str:
     """用 Tavily 检索项目公开信息，返回拼合后的文本摘要。无 key 或失败时静默返回空串。"""
-    key = os.environ.get('TAVILY_API_KEY', '')
+    key = settings.TAVILY_API_KEY
     if not key or not project:
         return ''
     queries = [
@@ -22,10 +29,10 @@ def search_company(project: str, category: str = '') -> str:
     for q in queries:
         try:
             resp = httpx.post(
-                'https://api.tavily.com/search',
+                f'{settings.TAVILY_BASE_URL}/search',
                 json={'api_key': key, 'query': q,
                       'search_depth': 'basic', 'max_results': 4},
-                timeout=15
+                timeout=15,
             )
             for item in resp.json().get('results', []):
                 snippet = f"[{item.get('title','')}]\n{item.get('content','')[:400]}"
@@ -74,25 +81,28 @@ def extract_text(filename: str, content: bytes) -> str:
 
 
 def stream_weekly_generation(project: str, week: str, extra: str, category: str,
-                             biz_scope: str, stage: str, progress: str, files,
-                             system_prompt: str, model: str):
+                             biz_scope: str, stage: str, progress: str, file_data,
+                             system_prompt: str, db_session=None):
     """Yield SSE-ready payload strings for the weekly-report generation endpoint."""
-    api_key = os.environ.get('DEEPSEEK_API_KEY', '')
-    if not api_key:
-        yield f'data: {json.dumps({"error": "未设置 DEEPSEEK_API_KEY 环境变量"})}\n\n'
+    from reporter.services.ai_provider import get_provider
+
+    try:
+        provider = get_provider(db_session)
+    except ValueError as e:
+        yield f'data: {json.dumps({"error": str(e)})}\n\n'
         return
 
     file_blocks = []
-    for f in files:
+    for filename, content in file_data:
         try:
-            text = extract_text(f.filename, f.read())
+            text = extract_text(filename, content)
             if text.strip():
-                file_blocks.append(f'=== {f.filename} ===\n{text[:10000]}')
+                file_blocks.append(f'=== {filename} ===\n{text[:10000]}')
         except Exception as e:
-            yield f'data: {json.dumps({"error": f"{f.filename} 解析失败：{e}"})}\n\n'
+            yield f'data: {json.dumps({"error": f"{filename} 解析失败：{e}"})}\n\n'
             return
 
-    tavily_key = os.environ.get('TAVILY_API_KEY', '')
+    tavily_key = settings.TAVILY_API_KEY
     if tavily_key:
         yield f'data: {json.dumps({"status": "正在检索公开信息…"})}\n\n'
     search_text = search_company(project, category)
@@ -114,38 +124,5 @@ def stream_weekly_generation(project: str, week: str, extra: str, category: str,
         parts.append('\n--- 上传材料 ---\n' + '\n\n'.join(file_blocks))
     user_msg = '\n'.join(parts)
 
-    try:
-        payload = {
-            'model': model,
-            'messages': [
-                {'role': 'system', 'content': system_prompt},
-                {'role': 'user', 'content': user_msg}
-            ],
-            'stream': True,
-            'max_tokens': 2500,
-        }
-        headers = {
-            'Authorization': f'Bearer {api_key}',
-            'Content-Type': 'application/json',
-        }
-        with httpx.stream('POST', 'https://api.deepseek.com/chat/completions',
-                          json=payload, headers=headers, timeout=120) as r:
-            if r.status_code >= 400:
-                yield f'data: {json.dumps({"error": f"AI 服务返回错误：HTTP {r.status_code}"})}\n\n'
-                return
-            for line in r.iter_lines():
-                if not line.startswith('data: '):
-                    continue
-                data_str = line[6:].strip()
-                if data_str == '[DONE]':
-                    break
-                try:
-                    delta = json.loads(data_str)['choices'][0]['delta'].get('content', '')
-                    if delta:
-                        delta = delta.replace('*', '')
-                        yield f'data: {json.dumps({"text": delta})}\n\n'
-                except Exception:
-                    pass
-        yield f'data: {json.dumps({"done": True})}\n\n'
-    except Exception as e:
-        yield f'data: {json.dumps({"error": str(e)})}\n\n'
+    for chunk in provider.stream_chat(system_prompt, user_msg, ""):
+        yield chunk

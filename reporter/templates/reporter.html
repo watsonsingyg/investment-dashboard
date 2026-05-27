@@ -1,51 +1,40 @@
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>周报生成器 · 语涵</title>
-<link rel="stylesheet" href="/static/reporter.css">
-</head>
-<body>
-<div class="page">
+{% extends "_base.html" %}
+{% block title %}周报生成器 · Pipeline{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="/static/reporter.css">{% endblock %}
 
-<div class="masthead">
-  <div>
-    <div class="masthead-label">战投 · 周报生成器</div>
-    <h1>项目进展周报生成</h1>
-    <div class="masthead-meta">
-      <span>Skills：investment-taste &middot; yuhan-writing-style</span>
-      <span>Model：{{GENERATION_MODEL}}</span>
-      <span id="excelName" style="color:var(--text2)"></span>
-    </div>
+{% block content %}
+<div class="page">
+<div class="page-header">
+  <div class="page-header-label">Strategic Investment · Weekly Reporter</div>
+  <h1>项目进展周报生成</h1>
+  <div class="page-header-meta">
+    <span>Skills：investment-taste · yuhan-writing-style</span>
+    <span>·</span>
+    <span>Model：{{ generation_model }}</span>
+    <span>·</span>
+    <span id="excelName" style="color:var(--text2)"></span>
   </div>
-  <a href="/dashboard" target="_blank" class="dash-link">← Pipeline 看板</a>
 </div>
 
-<div class="grid">
+<div class="reporter-grid">
+  <div class="config-panel">
+    <div class="section-label" style="border-top:none;padding-top:0;margin-top:0">项目信息</div>
 
-  <!-- ── 左：配置区 ── -->
-  <div class="config">
-
-    <div class="section-label" style="border-top:none;padding-top:0;">项目信息</div>
-
-    <!-- 1. 项目名称 -->
     <div class="field">
       <label>项目名称</label>
-      <select id="projSelect" onchange="onProjSelect(this.value)">
-        <option value="">— 选择已有项目 —</option>
-        <option value="__new__">＋ 新增项目</option>
-        <optgroup label="已有项目" id="projOpts"></optgroup>
-      </select>
-      <input id="projCustom" type="text" placeholder="新项目名称…"
-        style="display:none;margin-top:7px">
+      <div class="search-select-wrap" id="projSearchWrap">
+        <input id="projSearchInput" type="text" placeholder="输入项目名称搜索…" autocomplete="off"
+          onfocus="showProjDropdown()" oninput="filterProjOptions()" onkeydown="handleProjKeydown(event)" onblur="hideProjDropdown()">
+        <div class="search-select-dropdown" id="projDropdown" style="display:none;">
+          <div class="ss-option ss-new" onmousedown="selectProj('__new__')">＋ 新增项目</div>
+          <div id="projOptionList"></div>
+        </div>
+      </div>
+      <input id="projCustom" type="text" placeholder="新项目名称…" style="display:none;margin-top:7px">
     </div>
 
     <div class="recent-box" id="recentBox" style="display:none">
-      <div class="recent-top">
-        <span class="recent-label">最近一次周报</span>
-        <span class="recent-week" id="recentWeek"></span>
-      </div>
+      <div class="recent-top"><span class="recent-label">最近一次周报</span><span class="recent-week" id="recentWeek"></span></div>
       <div class="recent-text" id="recentText"></div>
       <div class="recent-actions">
         <button type="button" onclick="useRecentAsContext()">带入最近进展</button>
@@ -53,54 +42,30 @@
       </div>
     </div>
 
-    <!-- 2. 周次（日历选择） -->
-    <div class="field">
-      <label>项目打分</label>
-      <select id="scoreSelect">
-        <option value="">— 必选评分 —</option>
-        <option value="5">5 夯爆了</option>
-        <option value="4">4 顶级</option>
-        <option value="3">3 人上人</option>
-        <option value="2">2 NPC</option>
-        <option value="1">1 拉完了</option>
-      </select>
-    </div>
+    <div class="field"><label>项目打分</label><select id="scoreSelect"><option value="">— 必选评分 —</option><option value="5">5 夯爆了</option><option value="4">4 顶级</option><option value="3">3 人上人</option><option value="2">2 NPC</option><option value="1">1 拉完了</option></select></div>
 
-    <!-- 3. 周次（日历选择） -->
-    <div class="field">
-      <label>周次</label>
+    <div class="field"><label>周次</label>
       <div class="week-picker-wrap">
-        <input id="weekDisplay" type="text" readonly
-          placeholder="点击选择周次" onclick="toggleWC(event)">
+        <input id="weekDisplay" type="text" readonly placeholder="点击选择周次" onclick="toggleWC(event)">
         <div class="week-cal" id="weekCal">
-          <div class="wc-nav">
-            <button type="button" onclick="wcPrev(event)">‹</button>
-            <span id="wcTitle"></span>
-            <button type="button" onclick="wcNext(event)">›</button>
-          </div>
-          <div class="wc-hdr">
-            <span>一</span><span>二</span><span>三</span><span>四</span><span>五</span>
-          </div>
+          <div class="wc-nav"><button type="button" onclick="wcPrev(event)">‹</button><span id="wcTitle"></span><button type="button" onclick="wcNext(event)">›</button></div>
+          <div class="wc-hdr"><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span></div>
           <div id="wcGrid"></div>
         </div>
       </div>
     </div>
 
-    <!-- 4. 项目类别 -->
-    <div class="field">
-      <label>项目类别</label>
-      <input id="catInput" type="text"
-        list="industryOptions"
-        placeholder="如：企业级AI工具 · 供应链金融 · B2B SaaS…"
-        oninput="inferCat(this.value)">
+    <div class="field"><label>项目类别</label>
+      <div class="search-select-wrap" id="indSearchWrap">
+        <input id="catInput" type="text" placeholder="输入细分行业搜索…" autocomplete="off"
+          onfocus="showIndDropdown()" oninput="filterIndOptions(); inferCat(this.value)" onkeydown="handleIndKeydown(event)" onblur="hideIndDropdown()">
+        <div class="search-select-dropdown" id="indDropdown" style="display:none;"><div id="indOptionList"></div></div>
+      </div>
       <div class="cat-badge" id="catBadge"></div>
     </div>
 
-    <!-- 5. 项目进展 + 阶段选择 -->
-    <div class="field">
-      <label>项目进展</label>
-      <textarea id="progressInput" rows="3"
-        placeholder="本周动态、已完成事项、关键进展、待跟进事项…"></textarea>
+    <div class="field"><label>项目进展</label>
+      <textarea id="progressInput" rows="3" placeholder="本周动态、已完成事项、关键进展、待跟进事项…"></textarea>
       <div class="stage-wrap">
         <div class="s-chip" data-s="前期沟通" onclick="pickStage(this)">前期沟通</div>
         <div class="s-chip" data-s="正式尽调" onclick="pickStage(this)">正式尽调</div>
@@ -109,66 +74,49 @@
       </div>
     </div>
 
-    <!-- 6. 补充说明 -->
-    <div class="field">
-      <label>补充说明（可选）</label>
-      <textarea id="extraInput" rows="2"
-        placeholder="需重点分析的维度、会议重点观点…"></textarea>
-    </div>
+    <div class="field"><label>补充说明（可选）</label><textarea id="extraInput" rows="2" placeholder="需重点分析的维度、会议重点观点…"></textarea></div>
 
     <div class="section-label">上传材料</div>
-
     <div class="drop-zone" id="dropZone">
       <div class="drop-hint">拖拽文件至此，或点击选择</div>
-      <div class="drop-fmt">BP &middot; 产品手册 &middot; 会议纪要 &middot; 财报 &middot; 审计报告 &middot; DOCX &middot; PDF &middot; XLSX · 单文件 10MB / 总计 25MB</div>
-      <input type="file" id="fileInput" multiple
-        accept=".pdf,.docx,.txt,.xlsx,.md,.csv"
-        onchange="onFileSelect(this.files)">
+      <div class="drop-fmt">BP · 产品手册 · 会议纪要 · 财报 · 审计报告 · DOCX · PDF · XLSX · 单文件 10MB / 总计 25MB</div>
+      <input type="file" id="fileInput" multiple accept=".pdf,.docx,.txt,.xlsx,.md,.csv" onchange="onFileSelect(this.files)">
     </div>
     <div class="file-list" id="fileList"></div>
 
     <button type="button" class="btn-gen" id="genBtn" onclick="startGen()">生成周报内容</button>
+    <button type="button" class="btn-cancel" id="cancelGenBtn" style="display:none" onclick="cancelGen()">取消生成</button>
 
-    <div class="skills-info">
-      INVESTMENT-TASTE · CVC 战略协同分析视角<br>
-      YUHAN-WRITING-STYLE · 语涵投资写作规范<br>
-      综合材料 + 行业背景 → 周报条目
+    <div style="margin-top:12px">
+      <label class="toggle-switch" style="display:inline-block;vertical-align:middle"><input type="checkbox" id="queueModeCheck" onchange="toggleQueueMode()"><span class="toggle-slider"></span></label>
+      <span style="font-size:11px;font-weight:500;color:var(--text3);margin-left:8px;vertical-align:middle">队列模式 <span class="queue-count" id="queueCount" style="display:none"></span></span>
     </div>
-
+    <div class="skills-info">INVESTMENT-TASTE · CVC 战略协同分析视角<br>YUHAN-WRITING-STYLE · 语涵投资写作规范<br>综合材料 + 行业背景 → 周报条目</div>
   </div>
 
-  <!-- ── 右：输出区 ── -->
   <div>
-    <div class="out-header">
-      <div class="out-label">生成内容</div>
-      <div class="out-meta" id="outMeta"></div>
-    </div>
+    <div class="out-header"><div class="out-label">生成内容</div><div class="out-meta" id="outMeta"></div></div>
     <div class="draft-status" id="draftStatus"></div>
-
-    <div class="prog-bar" id="progBar">
-      <div class="spinner"></div>
-      <span>正在分析材料，生成周报内容中…</span>
-    </div>
-
-    <div id="outArea">
-      <textarea class="out-edit" id="oe"
-        placeholder="在此输入本周进展，或点击「生成周报内容」由 AI 生成后在此编辑"
-        oninput="handleOutputInput(this.value)"></textarea>
-    </div>
-
+    <div class="history-tabs" id="historyTabs" style="display:none"></div>
+    <div class="prog-bar" id="progBar"><div class="spinner"></div><span>正在分析材料，生成周报内容中…</span></div>
+    <div id="outArea"><textarea class="out-edit" id="oe" placeholder="在此输入本周进展，或点击「生成周报内容」由 AI 生成后在此编辑" oninput="handleOutputInput(this.value)"></textarea></div>
     <div class="action-row" id="actionRow" style="display:flex">
       <button type="button" class="btn-copy" onclick="copyOut()">复制内容</button>
       <button type="button" class="btn-push" id="pushBtn" onclick="pushDash()">推送至看板 →</button>
     </div>
     <div class="push-status" id="pushStatus"></div>
+    <div class="queue-panel" id="queuePanel" style="display:none"><div class="queue-header"><span>生成队列</span><button class="queue-clear" onclick="clearQueue()">清空</button></div><div class="queue-list" id="queueList"></div></div>
   </div>
+</div>
 
-</div><!-- /grid -->
-</div><!-- /page -->
+<div class="shortcut-bar" id="shortcutBar" style="display:none">
+  <span>⌨ Ctrl+Enter 生成 · Ctrl+Shift+Enter 推送 · Ctrl+Shift+C 复制 · Esc 取消</span>
+  <button onclick="document.getElementById('shortcutBar').style.display='none'" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:12px">✕</button>
+</div>
+</div>
 
-<datalist id="industryOptions"></datalist>
 <datalist id="bizScopeOptions"></datalist>
 <datalist id="ownerOptions"></datalist>
-<script src="/static/reporter.js"></script>
-</body>
-</html>
+{% endblock %}
+
+{% block extra_scripts %}<script src="/static/reporter.js"></script>{% endblock %}

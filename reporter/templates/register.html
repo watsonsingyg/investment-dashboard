@@ -1,0 +1,71 @@
+{% extends "_base.html" %}
+{% block title %}Pipeline · 注册{% endblock %}
+
+{% block content %}
+<div class="auth-page">
+<div class="auth-card">
+  <div class="auth-label">Pipeline · Investment Management</div>
+  <h1>创建账号</h1>
+  <div class="auth-error" id="err"></div>
+  <form id="registerForm">
+    <input type="text" id="display_name" placeholder="你的姓名" autofocus>
+    <input type="email" id="email" placeholder="邮箱" autocomplete="email">
+    <input type="password" id="password" placeholder="密码（至少6位）" autocomplete="new-password">
+    <button type="submit" class="btn btn-primary" id="submitBtn">创建账号</button>
+  </form>
+  <div class="auth-link">
+    已有账号？<a href="/login">登录</a>
+  </div>
+</div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+const form = document.getElementById('registerForm');
+const errEl = document.getElementById('err');
+const btn = document.getElementById('submitBtn');
+
+function showErr(msg) {
+  errEl.textContent = msg;
+  errEl.classList.add('show');
+}
+
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  errEl.classList.remove('show');
+  btn.disabled = true;
+  btn.textContent = '创建中...';
+
+  const display_name = document.getElementById('display_name').value.trim();
+  const email = document.getElementById('email').value.trim();
+  const password = document.getElementById('password').value.trim();
+
+  if (!email.includes('@')) { showErr('请输入有效的邮箱地址'); btn.disabled = false; btn.textContent = '创建账号'; return; }
+  if (password.length < 6) { showErr('密码至少 6 位'); btn.disabled = false; btn.textContent = '创建账号'; return; }
+
+  try {
+    const r = await fetch('/api/auth/register', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({display_name, email, password}),
+    });
+    const data = await r.json();
+    if (!r.ok) {
+      showErr(data.error || '注册失败');
+      btn.disabled = false;
+      btn.textContent = '创建账号';
+      return;
+    }
+
+    localStorage.setItem('pipeline_access_token', data.access_token);
+    localStorage.setItem('pipeline_refresh_token', data.refresh_token);
+    window.location.href = '/';
+  } catch (err) {
+    showErr('网络错误，请重试');
+    btn.disabled = false;
+    btn.textContent = '创建账号';
+  }
+});
+</script>
+{% endblock %}

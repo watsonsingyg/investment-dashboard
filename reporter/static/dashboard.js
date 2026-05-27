@@ -1,12 +1,56 @@
 let DATA = null;
 let FILTERED = [];
+let DISPLAYED = [];
 let donutChart = null;
+let _detailProject = null;
+let _detailOriginal = {};
 
 const statusClass = {'前期沟通':'tag-gray','正式尽调':'tag-amber','协议签署/交割':'tag-blue','投后':'tag-green'};
 const priorityClass = {'高':'tag-red','中':'tag-amber','低':'tag-gray'};
 const scoreClass = {'1':'tag-gray','2':'tag-gray','3':'tag-blue','4':'tag-amber','5':'tag-red'};
 const fallbackScoreLabels = {'1':'1 拉完了','2':'2 NPC','3':'3 人上人','4':'4 顶级','5':'5 夯爆了'};
 const scoreOrder = ['5','4','3','2','1'];
+
+// ── 排序 ────────────────────────────────────────────────────────────────────
+let sortColumn = null;
+let sortDirection = 0; // 0=无, 1=升序, -1=降序
+
+const STATUS_ORDER = {'前期沟通':1,'正式尽调':2,'协议签署/交割':3,'投后':4};
+const PRIORITY_ORDER = {'高':3,'中':2,'低':1};
+
+function sortData(data, col, dir){
+  if (!col || dir === 0) return [...data];
+  return [...data].sort((a, b) => {
+    let va = a[col] ?? '', vb = b[col] ?? '';
+    if (col === 'score_label') { va = a['score'] ?? ''; vb = b['score'] ?? ''; }
+    if (col === 'status') { va = STATUS_ORDER[va] ?? 0; vb = STATUS_ORDER[vb] ?? 0; return (va - vb) * dir; }
+    if (col === 'priority') { va = PRIORITY_ORDER[va] ?? 0; vb = PRIORITY_ORDER[vb] ?? 0; return (va - vb) * dir; }
+    if (col === 'last_active') { va = a['last_active_iso'] || a['last_active'] || ''; vb = b['last_active_iso'] || b['last_active'] || ''; }
+    const na = Number(va), nb = Number(vb);
+    if (!isNaN(na) && !isNaN(nb)) return (na - nb) * dir;
+    return String(va).localeCompare(String(vb), 'zh-CN') * dir;
+  });
+}
+
+function toggleSort(colKey){
+  if (sortColumn === colKey) {
+    if (sortDirection === 1) sortDirection = -1;
+    else { sortDirection = 0; sortColumn = null; }
+  } else {
+    sortColumn = colKey;
+    sortDirection = 1;
+  }
+  updateSortArrows();
+  applyFilters();
+}
+
+function updateSortArrows(){
+  document.querySelectorAll('.sort-arrow').forEach(el => el.textContent = '');
+  if (sortColumn && sortDirection !== 0) {
+    const arrow = document.getElementById('arrow-' + sortColumn);
+    if (arrow) arrow.textContent = sortDirection === 1 ? ' ▲' : ' ▼';
+  }
+}
 const logicCards = [
   ['过滤器 01','业务协同：第一道必答题',['与百融 Voice / BaaS / MaaS 能力能否形成技术乘法效应','能否借助百融 7,000+ 金融机构渠道打开新客户','能否为百融带来新的赋能维度（数据、场景、牌照）'],'协同弱 → 直接降级，几乎必 pass'],
   ['过滤器 02','商业模式质量',['SaaS 订阅 / 结果付费 加分；纯项目制重交付 扣分','NDR > 110%、毛利率 > 60% 为优质参考线','规模化能力：产品能否低边际成本复制客户'],'项目制为主 → 估值大幅打折'],
@@ -69,10 +113,10 @@ function renderFilters(){
 
 function renderCharts(){
   const m=DATA.metrics;
-  document.getElementById('donutLegend').innerHTML = `<span><span class="legend-dot" style="background:#1a1a18;"></span>创新/AI ${m.ai_count}个</span><span><span class="legend-dot" style="background:#d4d2cc;"></span>传统 ${m.non_ai}个</span>`;
+  document.getElementById('donutLegend').innerHTML = `<span><span class="legend-dot" style="background:var(--amber);"></span>创新/AI ${m.ai_count}个</span><span><span class="legend-dot" style="background:var(--text3);"></span>传统 ${m.non_ai}个</span>`;
   const ctx=document.getElementById('donutChart').getContext('2d');
   if (donutChart && donutChart.destroy) donutChart.destroy();
-  donutChart = new Chart(ctx,{type:'doughnut',data:{labels:['创新/AI','传统'],datasets:[{data:[m.ai_count,m.non_ai],backgroundColor:['#1a1a18','#d4d2cc'],borderColor:['#faf9f7','#faf9f7'],borderWidth:3}]},options:{responsive:true,maintainAspectRatio:false,cutout:'65%',plugins:{legend:{display:false}}}});
+  donutChart = new Chart(ctx,{type:'doughnut',data:{labels:['创新/AI','传统'],datasets:[{data:[m.ai_count,m.non_ai],backgroundColor:['#D97706','#C4BDB4'],borderColor:['#FAF7F2','#FAF7F2'],borderWidth:3}]},options:{responsive:true,maintainAspectRatio:false,cutout:'65%',plugins:{legend:{display:false}}}});
   const stages = DATA.counts.stages, labels = ['前期沟通','正式尽调','协议签署/交割','投后'].filter(s=>stages[s]);
   document.getElementById('funnelSvg').innerHTML = buildFunnel(labels.map(s=>[s,stages[s]]));
   document.getElementById('funnelFooter').textContent = `本周活跃 ${m.active_count} 个 ／ 近 8 周新增 ${m.new_count} 个`;
@@ -90,7 +134,7 @@ function renderScores(){
 }
 function buildFunnel(rows){
   if(!rows.length) return '';
-  const w=460,h=58,totalH=h*rows.length,margin=w*.105,colors=['#1a1a18','#3d3d37','#6a6a62','#b87316'];
+  const w=460,h=58,totalH=h*rows.length,margin=w*.105,colors=['var(--amber)','#A0781C','#8B6914','#D97706'];
   let out=`<svg viewBox="0 0 ${w} ${totalH}" style="width:100%;max-width:${w}px;display:block;margin:0 auto;">`;
   rows.forEach(([label,count],i)=>{
     const lt=margin*i,rt=w-margin*i,lb=margin*(i+1),rb=w-margin*(i+1),yt=i*h,yb=(i+1)*h,cx=w/2,cy=yt+h/2;
@@ -111,7 +155,24 @@ function renderActivities(){
 }
 function renderCategories(){
   const entries=Object.entries(DATA.counts.categories).sort((a,b)=>b[1]-a[1]), max=entries[0]?.[1]||1;
-  document.getElementById('categoryList').innerHTML=entries.map(([cat,cnt])=>`<div class="ind-row"><div class="ind-label">${esc(cat)}</div><div class="ind-bar-wrap"><div class="ind-bar" style="width:${Math.round(cnt/max*100)}%;background:${cat.includes('AI')?'#1a1a18':'#c8c6c0'};"></div></div><div class="ind-cnt">${cnt}</div></div>`).join('');
+
+  // 聚合每个大类下的细分行业
+  const catInds = {};
+  DATA.projects.forEach(p => {
+    if (!catInds[p.category]) catInds[p.category] = [];
+    if (p.industry && !catInds[p.category].includes(p.industry)) {
+      catInds[p.category].push(p.industry);
+    }
+  });
+
+  document.getElementById('categoryList').innerHTML=entries.map(([cat,cnt])=> {
+    const inds = catInds[cat] || [];
+    const sub = inds.length ? inds.join('、') : '';
+    return `<div class="ind-row-wrap">
+      <div class="ind-row"><div class="ind-label">${esc(cat)}</div><div class="ind-bar-wrap"><div class="ind-bar" style="width:${Math.round(cnt/max*100)}%;background:${cat.includes('AI')?'var(--amber)':'var(--text3)'};"></div></div><div class="ind-cnt">${cnt}</div></div>
+      ${sub ? `<div class="ind-sub">${esc(sub)}</div>` : ''}
+    </div>`;
+  }).join('');
 }
 function renderLogic(){
   document.getElementById('logicGrid').innerHTML = logicCards.map(c=>`<div class="logic-card"><div class="logic-num">${c[0]}</div><div class="logic-title">${c[1]}</div><ul class="logic-items">${c[2].map(i=>`<li>${esc(i)}</li>`).join('')}</ul><div class="logic-verdict">${esc(c[3])}</div></div>`).join('');
@@ -170,8 +231,10 @@ function applyFilters(){
   document.getElementById('exportWeekly').href='/api/export/weekly.md?week='+encodeURIComponent(DATA.meta.latest_week);
 }
 function renderTable(){
+  const sorted = sortData(FILTERED, sortColumn, sortDirection);
+  DISPLAYED = sorted;
   document.getElementById('tableLabel').textContent=`全项目追踪（${FILTERED.length}/${DATA.projects.length} 个）—— 点击行查看详情`;
-  document.getElementById('projTbody').innerHTML = FILTERED.map((p,i)=>{
+  document.getElementById('projTbody').innerHTML = sorted.map((p,i)=>{
     const snippet=p.latest_content || (p.timeline?.[0]?.content || '');
     const aiDot=p.is_ai?'<span class="ai-dot" title="创新/AI"></span>':'<span class="ai-dot" style="background:transparent;border:.5px solid var(--border2);"></span>';
     return `<tr onclick="openDetail(${i})" style="cursor:pointer;"><td><span class="tbl-name">${aiDot}${esc(p.name)}</span></td><td class="tbl-cell">${esc(p.category)}</td><td class="tbl-cell">${esc(p.industry)}</td><td>${tag(p.status,statusClass[p.status])}</td><td>${tag(p.priority,priorityClass[p.priority])}</td><td>${tag(p.score_label||'未评分',scoreClass[p.score])}</td><td class="tbl-cell tbl-snippet">${esc(trunc(snippet,70))||'<span style="color:var(--text3)">—</span>'}</td><td class="tbl-week">${p.last_active?shortWeek(p.last_active):'—'}</td></tr>`;
@@ -180,7 +243,10 @@ function renderTable(){
 }
 
 function openDetail(idx){
-  const p=FILTERED[idx];
+  const p=DISPLAYED[idx];
+  _detailProject = p.name;
+  _detailOriginal = {};
+  p.timeline.forEach(e => { _detailOriginal[e.week] = e.content; });
   document.getElementById('dp-name').textContent=p.name;
   const aiDot=p.is_ai?'<span class="ai-dot" title="创新/AI" style="display:inline-block;"></span>':'';
   document.getElementById('dp-badges').innerHTML=`${aiDot}${tag(p.status,statusClass[p.status])}${tag(p.score_label||'未评分',scoreClass[p.score])}${tag(p.industry,'tag-gray')}<span class="detail-owner">${esc(p.owner)}</span>`;
@@ -188,7 +254,7 @@ function openDetail(idx){
   document.getElementById('dp-body').innerHTML = buildEditForm(p)
     + `<div class="detail-section-label">最近变更</div><div id="audit-list" class="audit-list"><div class="empty" style="display:block;padding:8px 0;text-align:left;">正在读取…</div></div>`
     + `<div class="detail-section-label">进展时间轴（${p.timeline.length} 条记录，最新在前）</div>`
-    + (p.timeline.length?p.timeline.map(e=>`<div class="tl-entry"><div class="tl-week">${esc(e.week)}</div><div class="tl-summary">${esc(e.medium||e.content.slice(0,130))}</div><details><summary>查看原文</summary><div class="tl-raw">${esc(e.content)}</div></details></div>`).join(''):'<div class="empty" style="display:block;">暂无历史记录</div>');
+    + (p.timeline.length?p.timeline.map(e=>`<div class="tl-entry" id="tl-${esc(e.week)}"><div class="tl-week">${esc(e.week)}</div><div class="tl-summary">${esc(e.medium||e.content.slice(0,130))}</div><details><summary>查看原文</summary><div class="tl-raw">${esc(e.content)}</div></details><button class="tl-edit-btn" onclick="editTimelineNode(event,'${esc(e.week)}')">编辑</button></div>`).join(''):'<div class="empty" style="display:block;">暂无历史记录</div>');
   document.getElementById('modal-overlay').classList.add('open');
   document.body.style.overflow='hidden';
   loadAudit(p.name);
@@ -226,6 +292,8 @@ async function saveProjectEdit(encodedName){
   if(!r.ok){msg.textContent='保存失败：'+(res.error||'未知错误');return;}
   msg.textContent='已保存';
   await loadDashboard();
+  const idx = DISPLAYED.findIndex(p => p.name === _detailProject);
+  if (idx >= 0) openDetail(idx);
 }
 async function loadAudit(name){
   const el=document.getElementById('audit-list');
@@ -250,5 +318,60 @@ async function loadAudit(name){
 function closeDetail(){document.getElementById('modal-overlay').classList.remove('open');document.body.style.overflow='';}
 function handleOverlayClick(e){if(e.target===document.getElementById('modal-overlay'))closeDetail();}
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeDetail();});
+
+// ── 时间轴编辑 ──────────────────────────────────────────────────────────────
+function editTimelineNode(e, week){
+  e.stopPropagation();
+  if (!_detailProject) return;
+  const el = document.getElementById('tl-' + week);
+  if (!el) return;
+  const original = _detailOriginal[week] || '';
+  el.innerHTML = `<div class="tl-week">${esc(week)}</div>
+    <textarea class="tl-edit-area">${esc(original)}</textarea>
+    <div class="tl-edit-actions">
+      <button class="btn-tl-save" onclick="saveTimelineEdit(event,'${esc(week)}')">保存</button>
+      <button class="btn-tl-cancel" onclick="cancelTimelineEdit(event,'${esc(week)}')">取消</button>
+      <span class="tl-edit-status"></span>
+    </div>`;
+}
+
+async function saveTimelineEdit(e, week){
+  e.stopPropagation();
+  if (!_detailProject) return;
+  const el = document.getElementById('tl-' + week);
+  if (!el) return;
+  const textarea = el.querySelector('.tl-edit-area');
+  const statusEl = el.querySelector('.tl-edit-status');
+  const content = textarea ? textarea.value.trim() : '';
+  if (!content) { if (statusEl) statusEl.textContent = '内容不能为空'; return; }
+  if (statusEl) statusEl.textContent = '正在保存…';
+  try {
+    const r = await fetch('/api/projects/' + encodeURIComponent(_detailProject) + '/week/' + encodeURIComponent(week), {
+      method: 'PATCH',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({content: content})
+    });
+    const res = await r.json();
+    if (!r.ok) { if (statusEl) statusEl.textContent = '保存失败：' + (res.error || '未知错误'); return; }
+    if (statusEl) statusEl.textContent = '已保存';
+    await loadDashboard();
+    const idx = DISPLAYED.findIndex(p => p.name === _detailProject);
+    if (idx >= 0) openDetail(idx);
+  } catch(err) {
+    if (statusEl) statusEl.textContent = '网络错误：' + err.message;
+  }
+}
+
+function cancelTimelineEdit(e, week){
+  e.stopPropagation();
+  if (!_detailProject) return;
+  const el = document.getElementById('tl-' + week);
+  if (!el) return;
+  const original = _detailOriginal[week] || '';
+  el.innerHTML = `<div class="tl-week">${esc(week)}</div>
+    <div class="tl-summary">${esc(original.slice(0,130))}</div>
+    <details><summary>查看原文</summary><div class="tl-raw">${esc(original)}</div></details>
+    <button class="tl-edit-btn" onclick="editTimelineNode(event,'${esc(week)}')">编辑</button>`;
+}
 
 loadDashboard().catch(e=>{document.body.innerHTML=`<div class="page"><div class="masthead"><h1>看板加载失败</h1><div class="masthead-meta">${esc(e.message)}</div></div></div>`;});

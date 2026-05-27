@@ -3,12 +3,20 @@
 import hashlib
 import json
 import re
+import sys
 from collections import Counter, defaultdict
 from datetime import datetime, timedelta
 from difflib import SequenceMatcher
+from pathlib import Path
 from typing import Optional
 
 import openpyxl
+
+_PROJECT_ROOT = str(Path(__file__).parent.parent)
+if _PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, _PROJECT_ROOT)
+
+from config import settings  # noqa: E402
 
 try:
     from .dashboard_data import is_week_header, parse_excel, parse_week_start
@@ -73,11 +81,11 @@ def _make_issue(issue_type: str, project: Optional[dict], reason: str, suggestio
 
 
 def _override_path(report_dir) -> str:
-    return str(find_excel(report_dir).parent / 'logs' / 'governance_overrides.json')
+    return str(settings.GOVERNANCE_OVERRIDES)
 
 
 def load_governance_overrides(report_dir) -> dict:
-    path = find_excel(report_dir).parent / 'logs' / 'governance_overrides.json'
+    path = settings.GOVERNANCE_OVERRIDES
     if not path.exists():
         return {}
     try:
@@ -96,9 +104,8 @@ def save_governance_issue_state(report_dir, issue_key: str, state: str,
     if state not in ('active', 'ignored', 'confirmed'):
         raise ValueError('问题状态应为 active / ignored / confirmed')
 
-    log_dir = find_excel(report_dir).parent / 'logs'
-    log_dir.mkdir(exist_ok=True)
-    path = log_dir / 'governance_overrides.json'
+    path = settings.GOVERNANCE_OVERRIDES
+    path.parent.mkdir(exist_ok=True)
     overrides = load_governance_overrides(report_dir)
 
     if state == 'active':
@@ -202,7 +209,9 @@ def _assign_ids(issues: list[dict]) -> None:
         issue['id'] = f'{issue["type"]}-{idx}-{slug}'
 
 
-def load_governance_report(report_dir, stale_weeks: int = 8) -> dict:
+def load_governance_report(report_dir, stale_weeks: int = None) -> dict:
+    if stale_weeks is None:
+        stale_weeks = settings.STALE_WEEKS_THRESHOLD
     excel_path = find_excel(report_dir)
     data = parse_excel(str(excel_path))
     projects = data['projects']

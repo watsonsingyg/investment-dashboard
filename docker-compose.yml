@@ -1,0 +1,56 @@
+version: '3.8'
+
+services:
+  # ── PostgreSQL 数据库 ─────────────────────────────────────────────────
+  db:
+    image: postgres:16-alpine
+    container_name: pipeline_pg
+    environment:
+      POSTGRES_USER: pipeline
+      POSTGRES_PASSWORD: pipeline
+      POSTGRES_DB: pipeline_saas
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pipeline -d pipeline_saas"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  # ── Flask 应用 ────────────────────────────────────────────────────────
+  app:
+    build: .
+    container_name: pipeline_app
+    ports:
+      - "8766:8766"
+    environment:
+      - DATABASE_URL=postgresql://pipeline:pipeline@db:5432/pipeline_saas
+      - APP_HOST=0.0.0.0
+      - PORT=8766
+      - APP_DEBUG=false
+      - FLASK_SECRET=${FLASK_SECRET:-change-me-in-production}
+      - JWT_SECRET=${JWT_SECRET:-change-me-in-production}
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
+      - DEEPSEEK_MODEL=${DEEPSEEK_MODEL:-deepseek-v4-pro}
+      - TAVILY_API_KEY=${TAVILY_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+    volumes:
+      - app_data:/app/data
+      - app_logs:/app/logs
+      - app_backups:/app/backups
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    # 可选：覆写启动命令（如先跑迁移再启动）
+    # command: >
+    #   sh -c "python3 migrate_to_postgres.py --overwrite && python3 -u server.py"
+
+volumes:
+  pgdata:
+  app_data:
+  app_logs:
+  app_backups:

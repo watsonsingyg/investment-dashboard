@@ -4,7 +4,14 @@ import hashlib
 import json
 import os
 import re
+import sys
 from pathlib import Path
+
+_PROJECT_ROOT = str(Path(__file__).parent.parent)
+if _PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, _PROJECT_ROOT)
+
+from config import settings  # noqa: E402
 
 
 def clean_text(s: str) -> str:
@@ -20,7 +27,7 @@ def project_entry_key(project: str, content: str) -> str:
 
 
 def cache_path(report_dir) -> Path:
-    return Path(report_dir) / '.summaries_cache.json'
+    return settings.SUMMARIES_CACHE
 
 
 def load_cache(report_dir) -> dict:

@@ -4,18 +4,26 @@ import fcntl
 import os
 import re
 import shutil
+import sys
 import time
 from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
-from urllib.parse import unquote
 
 import openpyxl
 
+_PROJECT_ROOT = str(Path(__file__).parent.parent)
+if _PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, _PROJECT_ROOT)
+
+from config import settings  # noqa: E402
+
 try:
     from .statuses import normalize_score, normalize_status, score_label
+    from .summary_cache import clean_text
 except ImportError:
     from statuses import normalize_score, normalize_status, score_label
+    from summary_cache import clean_text
 
 
 class ExcelLockError(Exception):
@@ -26,7 +34,7 @@ class ExcelLockError(Exception):
 @contextmanager
 def _lock_excel(report_dir, timeout=10):
     """获取 Excel 文件的排他锁，超时抛出 ExcelLockError。"""
-    lock_path = Path(report_dir) / '.excel.lock'
+    lock_path = settings.EXCEL_LOCK
     fd = os.open(str(lock_path), os.O_CREAT | os.O_RDWR)
     try:
         start = time.monotonic()
@@ -106,7 +114,7 @@ def get_projects(report_dir) -> list:
 
 
 def get_project_row(report_dir, project: str) -> dict:
-    project = unquote(project or '').strip()
+    project = clean_text(project or '')
     path = find_excel(report_dir)
     wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
     ws = wb.active
@@ -114,7 +122,7 @@ def get_project_row(report_dir, project: str) -> dict:
     week_headers = _week_headers(ws)
     for r in range(2, ws.max_row + 1):
         value = ws.cell(r, 3).value
-        if value and str(value).strip() == project:
+        if value and clean_text(str(value)) == project:
             score = normalize_score(ws.cell(r, SCORE_COL).value) if score_col_exists else ''
             latest_week = ''
             latest_content = ''
@@ -146,13 +154,14 @@ def get_project_row(report_dir, project: str) -> dict:
 
 
 def get_existing_week_content(report_dir, project: str, week: str) -> dict:
+    project = clean_text(project or '')
     path = find_excel(report_dir)
     wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
     ws = wb.active
     proj_row = None
     for r in range(2, ws.max_row + 1):
         value = ws.cell(r, 3).value
-        if value and str(value).strip() == project:
+        if value and clean_text(str(value)) == project:
             proj_row = r
             break
 
@@ -178,7 +187,7 @@ def get_existing_week_content(report_dir, project: str, week: str) -> dict:
 
 def update_project_fields(report_dir, project: str, fields: dict) -> dict:
     allowed_keys = {'biz_scope', 'industry', 'owner', 'status', 'priority', 'score'}
-    project = unquote(project or '').strip()
+    project = clean_text(project or '')
     clean_fields = {k: str(v or '').strip() for k, v in fields.items() if k in allowed_keys}
     if not clean_fields:
         return {'ok': True, 'project': project, 'changes': [], 'backup_path': ''}
@@ -191,7 +200,7 @@ def update_project_fields(report_dir, project: str, fields: dict) -> dict:
         proj_row = None
         for r in range(2, ws.max_row + 1):
             value = ws.cell(r, 3).value
-            if value and str(value).strip() == project:
+            if value and clean_text(str(value)) == project:
                 proj_row = r
                 break
         if proj_row is None:
@@ -232,9 +241,11 @@ def update_project_fields(report_dir, project: str, fields: dict) -> dict:
     }
 
 
-def backup_workbook(report_dir, max_backups=30) -> Path:
+def backup_workbook(report_dir, max_backups: int = None) -> Path:
+    if max_backups is None:
+        max_backups = settings.MAX_BACKUPS
     src = find_excel(report_dir)
-    backup_dir = Path(report_dir) / 'backups'
+    backup_dir = settings.BACKUP_DIR
     backup_dir.mkdir(exist_ok=True)
     stem = src.stem
     suffix = src.suffix
@@ -260,6 +271,7 @@ def push_to_excel(report_dir, project: str, week: str, content: str,
     """写入周报内容，同时更新项目状态/类别。新项目自动追加行。
     列映射（1-indexed）：3=项目名, 4=业务范畴, 5=细分行业, 7=项目状态, 8=优先级, 9=项目打分, 10+=周报列
     """
+    project = clean_text(project or '')
     with _lock_excel(report_dir):
         backup_path = backup_workbook(report_dir)
         path = find_excel(report_dir)
@@ -271,7 +283,7 @@ def push_to_excel(report_dir, project: str, week: str, content: str,
 
         proj_row = None
         for r in range(2, ws.max_row + 1):
-            if ws.cell(r, 3).value and str(ws.cell(r, 3).value).strip() == project:
+            if ws.cell(r, 3).value and clean_text(str(ws.cell(r, 3).value)) == project:
                 proj_row = r
                 break
 
@@ -321,4 +333,61 @@ def push_to_excel(report_dir, project: str, week: str, content: str,
         'new_content': content,
         'old_score': old_score,
         'new_score': score,
+    }
+
+
+def update_week_content(report_dir, project: str, week: str, content: str) -> dict:
+    """更新指定项目、指定周次的周报内容（仅覆盖已存在的单元格）。
+
+    与 push_to_excel() 不同，此函数仅更新已有内容，不会新建项目行或周次列。
+    """
+    project = clean_text(project or '')
+    week = (week or '').strip()
+    content = (content or '').strip()
+
+    with _lock_excel(report_dir):
+        backup_path = backup_workbook(report_dir)
+        path = find_excel(report_dir)
+        wb = openpyxl.load_workbook(path)
+        ws = wb.active
+
+        # 查找项目行
+        proj_row = None
+        for r in range(2, ws.max_row + 1):
+            if ws.cell(r, 3).value and clean_text(str(ws.cell(r, 3).value)) == project:
+                proj_row = r
+                break
+        if proj_row is None:
+            wb.close()
+            raise KeyError(f'未找到项目：{project}')
+
+        # 查找周次列
+        week_col = None
+        week_start = first_week_col(ws)
+        for c in range(week_start, ws.max_column + 1):
+            hdr = ws.cell(1, c).value
+            if hdr and str(hdr).strip() == week:
+                week_col = c
+                break
+        if week_col is None:
+            wb.close()
+            raise KeyError(f'未找到周次列：{week}')
+
+        # 读取旧值
+        old_content = str(ws.cell(proj_row, week_col).value or '').strip()
+
+        # 写入新值
+        ws.cell(proj_row, week_col).value = content
+        wb.save(path)
+        wb.close()
+
+    return {
+        'ok': True,
+        'project': project,
+        'week': week,
+        'row': proj_row,
+        'col': week_col,
+        'old_content': old_content,
+        'new_content': content,
+        'backup_path': str(backup_path),
     }

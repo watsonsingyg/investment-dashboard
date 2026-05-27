@@ -1,43 +1,89 @@
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>战投工作台 · 登录</title>
-<style>
-:root{--bg:#faf9f7;--bg3:#ffffff;--border2:rgba(0,0,0,.14);--text:#1a1a18;--text3:#8e8d86;--r:8px}
-*{box-sizing:border-box;margin:0;padding:0}
-body{font-family:'Georgia','Noto Serif SC',serif;background:var(--bg);color:var(--text);
-  min-height:100vh;display:flex;align-items:center;justify-content:center}
-.card{width:340px;padding:44px 40px;background:var(--bg3);
-  border:.5px solid var(--border2);border-radius:16px}
-.label{font-family:'Courier New',monospace;font-size:10px;letter-spacing:.16em;
-  color:var(--text3);text-transform:uppercase;margin-bottom:20px}
-h1{font-size:24px;font-weight:normal;margin-bottom:32px;letter-spacing:-.4px}
-input[type=password]{
-  width:100%;padding:11px 14px;border:.5px solid var(--border2);
-  border-radius:var(--r);background:var(--bg);font-family:'Georgia',serif;
-  font-size:14px;color:var(--text);outline:none;transition:border-color .15s;
-  margin-bottom:14px}
-input[type=password]:focus{border-color:var(--text)}
-button{width:100%;padding:12px;background:var(--text);color:#fff;border:none;
-  border-radius:var(--r);font-family:'Georgia',serif;font-size:14px;cursor:pointer;
-  transition:opacity .15s}
-button:hover{opacity:.85}
-.err{font-family:'Courier New',monospace;font-size:11px;color:#9b2c2c;
-  margin-bottom:12px;display:none}
-.err.show{display:block}
-</style>
-</head>
-<body>
-<div class="card">
-  <div class="label">战投 · 工作台</div>
-  <h1>进入系统</h1>
-  <div class="err {{ERR_CLASS}}">{{ERROR}}</div>
-  <form method="POST">
-    <input type="password" name="password" placeholder="访问密码" autofocus>
-    <button type="submit">进入 →</button>
+{% extends "_base.html" %}
+{% block title %}Pipeline · 登录{% endblock %}
+{% block extra_css %}{% endblock %}
+
+{% block content %}
+<div class="auth-page">
+<div class="auth-card">
+  <div class="auth-label">Pipeline · Investment Management</div>
+  <h1>登录</h1>
+  <div class="auth-error" id="err"></div>
+  <form id="loginForm">
+    <input type="email" id="email" placeholder="邮箱" autofocus autocomplete="email">
+    <input type="password" id="password" placeholder="密码" autocomplete="current-password">
+    <button type="submit" class="btn btn-primary" id="submitBtn">进入工作台</button>
   </form>
+  <div class="auth-link">
+    没有账号？<a href="/register">注册</a>
+    <span style="margin:0 10px;color:var(--text3)">·</span>
+    <a href="#" onclick="showErr('请联系管理员重置密码');return false">忘记密码？</a>
+  </div>
 </div>
-</body>
-</html>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+localStorage.removeItem('pipeline_access_token');
+localStorage.removeItem('pipeline_refresh_token');
+document.cookie = 'pipeline_token=; Max-Age=0; Path=/; SameSite=Lax';
+
+const form = document.getElementById('loginForm');
+const errEl = document.getElementById('err');
+const btn = document.getElementById('submitBtn');
+
+function showErr(msg) {
+  errEl.textContent = msg;
+  errEl.classList.add('show');
+}
+
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  errEl.classList.remove('show');
+  btn.disabled = true;
+  btn.textContent = '登录中...';
+
+  const email = document.getElementById('email').value.trim();
+  const password = document.getElementById('password').value.trim();
+
+  if (!email || !password) {
+    showErr('请输入邮箱和密码');
+    btn.disabled = false;
+    btn.textContent = '进入工作台';
+    return;
+  }
+
+  try {
+    const r = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({email, password}),
+    });
+    const data = await r.json();
+    if (!r.ok) {
+      showErr(data.error || '登录失败');
+      btn.disabled = false;
+      btn.textContent = '进入工作台';
+      return;
+    }
+
+    localStorage.setItem('pipeline_access_token', data.access_token);
+    localStorage.setItem('pipeline_refresh_token', data.refresh_token);
+
+    try {
+      const cr = await fetch('/api/settings/ai-config', {
+        headers: {'Authorization': 'Bearer ' + data.access_token}
+      });
+      const cd = await cr.json();
+      window.location.href = cd.is_configured ? '/' : '/settings';
+    } catch(e) {
+      window.location.href = '/';
+    }
+  } catch (err) {
+    showErr('网络错误，请重试');
+    btn.disabled = false;
+    btn.textContent = '进入工作台';
+  }
+});
+</script>
+{% endblock %}

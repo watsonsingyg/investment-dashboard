@@ -2,12 +2,19 @@
 
 import json
 import sqlite3
+import sys
 from datetime import datetime
 from pathlib import Path
 
+_PROJECT_ROOT = str(Path(__file__).parent.parent)
+if _PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, _PROJECT_ROOT)
+
+from config import settings  # noqa: E402
+
 
 def db_path(report_dir) -> Path:
-    return Path(report_dir) / 'pipeline_shadow.db'
+    return settings.SHADOW_DB
 
 
 def connect(report_dir):

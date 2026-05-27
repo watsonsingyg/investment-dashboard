@@ -1,25 +1,32 @@
 """Append-only operation logging."""
 
 import json
+import sys
 from datetime import datetime
 from pathlib import Path
 
+_PROJECT_ROOT = str(Path(__file__).parent.parent)
+if _PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, _PROJECT_ROOT)
+
+from config import settings  # noqa: E402
+
 
 def log_operation(report_dir, event: str, **payload):
-    log_dir = Path(report_dir) / 'logs'
-    log_dir.mkdir(exist_ok=True)
+    log_path = settings.OPERATIONS_LOG
+    log_path.parent.mkdir(exist_ok=True)
     record = {
         'ts': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
         'event': event,
         **payload,
     }
-    with (log_dir / 'operations.jsonl').open('a', encoding='utf-8') as f:
+    with log_path.open('a', encoding='utf-8') as f:
         f.write(json.dumps(record, ensure_ascii=False, separators=(',', ':')) + '\n')
 
 
 def read_recent_operations(report_dir, project: str = '', limit: int = 20) -> list:
     """Return recent operation-log records, newest first."""
-    path = Path(report_dir) / 'logs' / 'operations.jsonl'
+    path = settings.OPERATIONS_LOG
     if not path.exists():
         return []
     rows = []

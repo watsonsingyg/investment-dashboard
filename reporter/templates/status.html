@@ -1,78 +1,71 @@
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>运行状态 · 战投工作台</title>
+{% extends "_base.html" %}
+{% block title %}Pipeline · 运行状态{% endblock %}
+{% block extra_css %}
 <style>
-:root{--bg:#faf9f7;--bg2:#f2f0eb;--bg3:#fff;--border:rgba(0,0,0,.08);--border2:rgba(0,0,0,.14);--text:#1a1a18;--text2:#5c5b55;--text3:#8e8d86;--green:#1d6b2e;--green-bg:#edf5e0;--red:#9b2c2c;--red-bg:#fdf0f0;--r:8px;--r2:12px}
-*{box-sizing:border-box;margin:0;padding:0}
-body{font-family:Georgia,'Noto Serif SC',serif;background:var(--bg);color:var(--text);line-height:1.62;font-size:14px}
-.page{width:100%;padding:40px 4% 80px}
-.masthead{display:flex;justify-content:space-between;align-items:flex-end;gap:24px;border-bottom:1.5px solid var(--text);padding-bottom:20px;margin-bottom:34px}
-.masthead-label,.section-label{font-family:'Courier New',monospace;font-size:10px;letter-spacing:.14em;color:var(--text3);text-transform:uppercase}
-.masthead-label{margin-bottom:8px}.masthead h1{font-size:28px;font-weight:normal;letter-spacing:-.5px;line-height:1.2}
-.masthead-meta{margin-top:10px;display:flex;gap:20px;flex-wrap:wrap;font-family:'Courier New',monospace;font-size:11px;color:var(--text3)}
-.top-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}.top-actions a,.ghost-btn{display:inline-flex;align-items:center;justify-content:center;min-height:34px;padding:8px 12px;border:.5px solid var(--border2);border-radius:var(--r);background:var(--bg3);font-family:'Courier New',monospace;font-size:10px;color:var(--text2);text-decoration:none;cursor:pointer;white-space:nowrap}.top-actions a:hover,.ghost-btn:hover{border-color:var(--text);color:var(--text)}
-.status-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:34px}.status-card{background:var(--bg3);border:.5px solid var(--border2);border-radius:var(--r);padding:16px;min-width:0}.status-card.hi{background:var(--text);color:#fff}.card-label{font-family:'Courier New',monospace;font-size:10px;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px}.status-card.hi .card-label{color:rgba(255,255,255,.54)}.card-value{font-size:23px;line-height:1.2;word-break:break-word}.card-sub{font-size:11px;color:var(--text3);margin-top:6px;word-break:break-word}.status-card.hi .card-sub{color:rgba(255,255,255,.5)}
-.section{margin-bottom:42px}.section-head{display:flex;justify-content:space-between;gap:18px;align-items:center;border-top:.5px solid var(--border2);padding-top:12px;margin-bottom:14px}.section-sub{font-size:12px;color:var(--text3);margin-top:5px}
-.kv-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.kv{background:var(--bg3);border:.5px solid var(--border2);border-radius:var(--r);padding:12px 14px;min-width:0}.kv dt{font-family:'Courier New',monospace;font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px}.kv dd{font-size:13px;color:var(--text);word-break:break-word}
-.log-box{background:#11110f;color:#f1efe8;border-radius:var(--r2);padding:16px 18px;min-height:320px;max-height:520px;overflow:auto;font-family:'Courier New',monospace;font-size:11px;line-height:1.55;white-space:pre-wrap;border:.5px solid rgba(0,0,0,.24)}
-.notice{display:none;margin-bottom:14px;padding:10px 12px;border-radius:var(--r);font-family:'Courier New',monospace;font-size:11px}.notice.ok{display:block;background:var(--green-bg);color:var(--green)}.notice.err{display:block;background:var(--red-bg);color:var(--red)}
-@media(max-width:1080px){.status-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.kv-grid{grid-template-columns:1fr}}
-@media(max-width:640px){.page{padding:28px 18px 64px}.masthead{display:block}.top-actions{justify-content:flex-start;margin-top:16px}.status-grid{grid-template-columns:1fr}.section-head{display:block}.section-head .ghost-btn{margin-top:12px}.masthead h1{font-size:25px}}
+.status-page { max-width: 1200px; margin: 0 auto; padding: 0 24px 80px; }
+.status-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 36px; }
+.status-card { background: var(--bg3); border: 1px solid var(--border); border-radius: var(--r2); padding: 20px 22px; box-shadow: var(--shadow-sm); transition: all var(--ease); }
+.status-card:hover { box-shadow: var(--shadow-md); transform: translateY(-1px); }
+.status-card.hi { background: linear-gradient(135deg, #0F172A 0%, #1E293B 100%); border-color: transparent; }
+.status-card .card-label { font-size: 10px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text3); margin-bottom: 6px; }
+.status-card.hi .card-label { color: rgba(255,255,255,0.5); }
+.status-card .card-value { font-size: 24px; font-weight: 700; line-height: 1.2; word-break: break-word; }
+.status-card.hi .card-value { color: #fff; }
+.status-card .card-sub { font-size: 11px; color: var(--text3); margin-top: 5px; word-break: break-word; }
+.status-card.hi .card-sub { color: rgba(255,255,255,0.45); }
+.kv-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+.kv { background: var(--bg3); border: 1px solid var(--border); border-radius: var(--r); padding: 14px 16px; }
+.kv dt { font-size: 10px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text3); margin-bottom: 5px; }
+.kv dd { font-size: 13px; color: var(--text); word-break: break-word; }
+.log-box { background: #0F172A; color: #E2E8F0; border-radius: var(--r2); padding: 18px 20px; min-height: 320px; max-height: 520px; overflow: auto; font-family: 'SF Mono', 'Fira Code', 'Courier New', monospace; font-size: 12px; line-height: 1.7; white-space: pre-wrap; border: 1px solid rgba(255,255,255,0.06); }
+@media (max-width: 1080px) { .status-grid { grid-template-columns: repeat(2, 1fr); } .kv-grid { grid-template-columns: 1fr; } }
+@media (max-width: 640px) { .status-page { padding: 0 16px 60px; } .status-grid { grid-template-columns: 1fr; } }
 </style>
-</head>
-<body>
-<div class="page">
-  <div class="masthead">
-    <div>
-      <div class="masthead-label">战投 · 运维状态</div>
-      <h1>运行状态</h1>
-      <div class="masthead-meta" id="mastheadMeta"></div>
-    </div>
-    <nav class="top-actions">
-      <a href="/" target="_blank" rel="noopener">工作台</a>
-      <a href="/dashboard" target="_blank" rel="noopener">看板</a>
-      <a href="/reporter" target="_blank" rel="noopener">生成器</a>
-      <a href="/governance" target="_blank" rel="noopener">健康检查</a>
-    </nav>
+{% endblock %}
+
+{% block content %}
+<div class="status-page">
+  <div class="page-header">
+    <div class="page-header-label">Pipeline · Runtime Status</div>
+    <h1>运行状态</h1>
+    <div class="page-header-meta" id="mastheadMeta"></div>
   </div>
 
-  <div id="notice" class="notice"></div>
+  <div class="notice" id="notice"></div>
   <div class="status-grid" id="statusGrid"></div>
 
   <section class="section">
-    <div class="section-head">
-      <div>
-        <div class="section-label">诊断信息</div>
-        <div class="section-sub">只展示当前服务、模型、Excel 和同步状态，不在页面内重启或结束进程。</div>
-      </div>
-      <button class="ghost-btn" id="copyBtn">复制诊断信息</button>
+    <div class="section-header">
+      <div><div class="section-label">诊断信息</div><div style="font-size:12px;color:var(--text3);margin-top:4px">只展示当前服务、模型、Excel 和同步状态，不在页面内重启或结束进程。</div></div>
+      <button class="btn btn-secondary btn-sm" id="copyBtn">复制诊断信息</button>
     </div>
     <dl class="kv-grid" id="kvGrid"></dl>
   </section>
 
   <section class="section">
-    <div class="section-head">
-      <div>
-        <div class="section-label">服务日志</div>
-        <div class="section-sub" id="logSub">读取 logs/server.log 最近 200 行。</div>
-      </div>
-      <button class="ghost-btn" id="refreshBtn">刷新日志</button>
+    <div class="section-header">
+      <div><div class="section-label">服务日志</div><div style="font-size:12px;color:var(--text3);margin-top:4px" id="logSub">读取 logs/server.log 最近 200 行。</div></div>
+      <button class="btn btn-secondary btn-sm" id="refreshBtn">刷新日志</button>
     </div>
     <pre class="log-box" id="logBox">正在读取…</pre>
   </section>
 </div>
+{% endblock %}
 
+{% block extra_scripts %}
 <script>
 let STATUS = null;
 function esc(s){return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
-function showNotice(text, kind){const el=document.getElementById('notice');el.className='notice '+(kind||'ok');el.textContent=text;setTimeout(()=>{el.className='notice';},2200);}
+function showNotice(text, kind){
+  const el=document.getElementById('notice');
+  el.className='notice notice-'+(kind||'info')+' show';
+  el.textContent=text;
+  setTimeout(()=>{el.className='notice';},2200);
+}
 function secondsLabel(n){n=Number(n||0);const h=Math.floor(n/3600),m=Math.floor((n%3600)/60);return h?`${h} 小时 ${m} 分钟`:`${m} 分钟`;}
 function renderStatus(data){
   STATUS = data;
-  document.getElementById('mastheadMeta').innerHTML = [`PID：${esc(data.pid)}`,`端口：${esc(data.port)}`,`模型：${esc(data.model)}`].map(x=>`<span>${x}</span>`).join('');
+  document.getElementById('mastheadMeta').innerHTML = [`PID：${esc(data.pid)}`,`端口：${esc(data.port)}`,`模型：${esc(data.model)}`].map(x=>`<span>${x}</span>`).join(' · ');
   document.getElementById('statusGrid').innerHTML = [
     ['服务状态','运行中',`已运行 ${secondsLabel(data.uptime_seconds)}`,'hi'],
     ['模型',data.model || '—','DeepSeek 生成配置',''],
@@ -99,12 +92,11 @@ async function loadLog(){
   document.getElementById('logSub').textContent = data.path || 'logs/server.log';
   document.getElementById('logBox').textContent = (data.lines || []).join('\n') || '暂无日志';
 }
-document.getElementById('refreshBtn').onclick = async()=>{try{await loadLog();showNotice('日志已刷新');}catch(e){showNotice(e.message,'err');}};
+document.getElementById('refreshBtn').onclick = async()=>{try{await loadLog();showNotice('日志已刷新','success');}catch(e){showNotice(e.message,'error');}};
 document.getElementById('copyBtn').onclick = ()=>{
   const text = JSON.stringify(STATUS || {}, null, 2);
-  navigator.clipboard.writeText(text).then(()=>showNotice('诊断信息已复制'));
+  navigator.clipboard.writeText(text).then(()=>showNotice('诊断信息已复制','success'));
 };
-Promise.all([loadStatus(), loadLog()]).catch(e=>showNotice(e.message,'err'));
+Promise.all([loadStatus(), loadLog()]).catch(e=>showNotice(e.message,'error'));
 </script>
-</body>
-</html>
+{% endblock %}

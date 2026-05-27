@@ -114,29 +114,144 @@ function clearCurrentDraft(){
   setDraftStatus('');
 }
 
-// ── 项目列表（下拉选择）──────────────────────────────────────────────────────
+// ── 项目列表（搜索选择器）─────────────────────────────────────────────────
+let allProjects = [];
+
 (async () => {
   try {
     const r = await fetch('/api/projects');
-    const projs = await r.json();
-    document.getElementById('projOpts').innerHTML =
-      projs.map(p => `<option value="${esc(p)}">${esc(p)}</option>`).join('');
+    allProjects = await r.json();
     const el = document.getElementById('excelName');
-    if (el) el.textContent = '共 ' + projs.length + ' 个项目';
+    if (el) el.textContent = '共 ' + allProjects.length + ' 个项目';
   } catch(e) { console.warn(e); }
 })();
 
+function renderProjOptions(filter){
+  const q = (filter || '').toLowerCase().trim();
+  const list = document.getElementById('projOptionList');
+  if (!list) return;
+  const filtered = q
+    ? allProjects.filter(p => p.toLowerCase().includes(q))
+    : allProjects;
+  list.innerHTML = filtered.length
+    ? filtered.map(p => `<div class="ss-option" onmousedown="selectProj('${esc(p)}')">${esc(p)}</div>`).join('')
+    : '<div class="ss-option ss-empty">无匹配项目</div>';
+}
+
+function showProjDropdown(){
+  const dd = document.getElementById('projDropdown');
+  if (dd) dd.style.display = 'block';
+  renderProjOptions(document.getElementById('projSearchInput').value);
+}
+
+function hideProjDropdown(){
+  setTimeout(() => {
+    const dd = document.getElementById('projDropdown');
+    if (dd) dd.style.display = 'none';
+  }, 180);
+}
+
+function filterProjOptions(){
+  renderProjOptions(document.getElementById('projSearchInput').value);
+  document.getElementById('projDropdown').style.display = 'block';
+}
+
+function handleProjKeydown(e){
+  const dd = document.getElementById('projDropdown');
+  if (dd.style.display === 'none') return;
+  const items = dd.querySelectorAll('.ss-option:not(.ss-empty):not(.ss-new)');
+  if (!items.length) return;
+  const current = dd.querySelector('.ss-option.ss-hl');
+  let idx = -1;
+  if (current) { idx = Array.from(items).indexOf(current); current.classList.remove('ss-hl'); }
+  if (e.key === 'ArrowDown') { e.preventDefault(); idx = (idx + 1) % items.length; items[idx].classList.add('ss-hl'); items[idx].scrollIntoView({block:'nearest'}); }
+  else if (e.key === 'ArrowUp') { e.preventDefault(); idx = idx <= 0 ? items.length - 1 : idx - 1; items[idx].classList.add('ss-hl'); items[idx].scrollIntoView({block:'nearest'}); }
+  else if (e.key === 'Enter') {
+    e.preventDefault();
+    if (current) current.click();
+  }
+  else if (e.key === 'Escape') { dd.style.display = 'none'; }
+}
+
+function selectProj(value){
+  const input = document.getElementById('projSearchInput');
+  input.value = (value === '__new__') ? '＋ 新增项目' : value;
+  document.getElementById('projDropdown').style.display = 'none';
+  onProjSelect(value);
+}
+
+function getProj() {
+  const input = document.getElementById('projSearchInput');
+  const v = input ? input.value : '';
+  const cu = document.getElementById('projCustom');
+  if (cu && cu.style.display !== 'none') return cu.value.trim();
+  return v === '＋ 新增项目' ? '' : v;
+}
+
+// ── 行业搜索选择器 ──────────────────────────────────────────────────────────
+let allIndustries = [];
+
+function renderIndOptions(filter){
+  const q = (filter || '').toLowerCase().trim();
+  const list = document.getElementById('indOptionList');
+  if (!list) return;
+  const filtered = q
+    ? allIndustries.filter(s => s.toLowerCase().includes(q))
+    : allIndustries;
+  list.innerHTML = filtered.length
+    ? filtered.map(s => `<div class="ss-option" onmousedown="selectInd('${esc(s)}')">${esc(s)}</div>`).join('')
+    : '<div class="ss-option ss-empty">无匹配分类，可直接输入新类别</div>';
+}
+
+function showIndDropdown(){
+  const dd = document.getElementById('indDropdown');
+  if (dd) dd.style.display = 'block';
+  renderIndOptions(document.getElementById('catInput').value);
+}
+
+function hideIndDropdown(){
+  setTimeout(() => {
+    const dd = document.getElementById('indDropdown');
+    if (dd) dd.style.display = 'none';
+  }, 180);
+}
+
+function filterIndOptions(){
+  renderIndOptions(document.getElementById('catInput').value);
+  document.getElementById('indDropdown').style.display = 'block';
+}
+
+function handleIndKeydown(e){
+  const dd = document.getElementById('indDropdown');
+  if (dd.style.display === 'none') return;
+  const items = dd.querySelectorAll('.ss-option:not(.ss-empty)');
+  if (!items.length) return;
+  const current = dd.querySelector('.ss-option.ss-hl');
+  let idx = -1;
+  if (current) { idx = Array.from(items).indexOf(current); current.classList.remove('ss-hl'); }
+  if (e.key === 'ArrowDown') { e.preventDefault(); idx = (idx + 1) % items.length; items[idx].classList.add('ss-hl'); items[idx].scrollIntoView({block:'nearest'}); }
+  else if (e.key === 'ArrowUp') { e.preventDefault(); idx = idx <= 0 ? items.length - 1 : idx - 1; items[idx].classList.add('ss-hl'); items[idx].scrollIntoView({block:'nearest'}); }
+  else if (e.key === 'Enter') { e.preventDefault(); if (current) current.click(); }
+  else if (e.key === 'Escape') { dd.style.display = 'none'; }
+}
+
+function selectInd(value){
+  document.getElementById('catInput').value = value;
+  document.getElementById('indDropdown').style.display = 'none';
+  inferCat(value);
+}
 async function loadFieldOptions(){
   try {
     const r = await fetch('/api/field-options');
     const opts = await r.json();
     if (!r.ok || opts.error) throw new Error(opts.error || '字段选项读取失败');
+    allIndustries = opts.industries || [];
+    renderIndOptions('');
     const fill = (id, values) => {
       const el = document.getElementById(id);
       if (!el) return;
       el.innerHTML = (values || []).map(v => `<option value="${esc(v)}"></option>`).join('');
     };
-    fill('industryOptions', opts.industries);
     fill('bizScopeOptions', opts.biz_scopes);
     fill('ownerOptions', opts.owners);
   } catch(e) { console.warn(e); }
@@ -154,10 +269,6 @@ function onProjSelect(v) {
     restoreDraftIfExists();
   }
   scheduleDraftSave();
-}
-function getProj() {
-  const v = document.getElementById('projSelect').value;
-  return v === '__new__' ? document.getElementById('projCustom').value.trim() : v;
 }
 
 // ── 周次（日历 week-picker）───────────────────────────────────────────────────
@@ -333,10 +444,22 @@ function onFileSelect(fl) {
   renderFiles();
 }
 function rmFile(n) { files = files.filter(f => f.name !== n); renderFiles(); }
+function formatSize(bytes) {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024*1024) return (bytes/1024).toFixed(1) + ' KB';
+  return (bytes/(1024*1024)).toFixed(1) + ' MB';
+}
+function fileIcon(name) {
+  const ext = (name||'').split('.').pop().toLowerCase();
+  const icons = {pdf:'PDF',docx:'DOC',xlsx:'XLS',csv:'CSV',md:'MD',txt:'TXT'};
+  return icons[ext] || 'FILE';
+}
 function renderFiles() {
   document.getElementById('fileList').innerHTML = files.map(f =>
     `<div class="file-row">
-      <span class="file-name">${f.name}</span>
+      <span class="file-type-badge">${fileIcon(f.name)}</span>
+      <span class="file-name">${esc(f.name)}</span>
+      <span class="file-size">${formatSize(f.size)}</span>
       <button class="file-rm" onclick="rmFile(${JSON.stringify(f.name)})">✕</button>
     </div>`).join('');
 }
@@ -349,6 +472,53 @@ dz.addEventListener('drop', e => {
 
 // ── 生成 ──────────────────────────────────────────────────────────────────────
 let generated = '';
+let abortController = null;
+const HISTORY_PREFIX = 'zhangtou-reporter-history-v1:';
+const MAX_HISTORY = 5;
+
+function getHistoryKey(proj, wk) {
+  return HISTORY_PREFIX + encodeURIComponent(proj||'') + '|' + (wk||'');
+}
+function saveToHistory() {
+  if (!generated || generated.trim().length < 50) return;
+  const key = getHistoryKey(getProj(), _selWeek);
+  if (!key) return;
+  let h = [];
+  try { h = JSON.parse(localStorage.getItem(key) || '[]'); } catch(e) {}
+  h.unshift({content:generated,ts:Date.now()});
+  h = h.slice(0, MAX_HISTORY);
+  localStorage.setItem(key, JSON.stringify(h));
+  renderHistoryTabs();
+}
+function renderHistoryTabs() {
+  const c = document.getElementById('historyTabs');
+  if (!c) return;
+  const key = getHistoryKey(getProj(), _selWeek);
+  let h = [];
+  try { h = JSON.parse(localStorage.getItem(key) || '[]'); } catch(e) {}
+  if (h.length <= 1) { c.style.display = 'none'; return; }
+  c.style.display = 'flex';
+  c.innerHTML = h.map((hi, i) => {
+    const d = new Date(hi.ts);
+    const t = d.toLocaleTimeString('zh-CN', {hour:'2-digit',minute:'2-digit'});
+    return `<span class="hist-tab${i===0?' active':''}" onclick="switchHistory(${i})">v${i+1} · ${t}</span>`;
+  }).join('');
+}
+function switchHistory(idx) {
+  if (generated && generated.trim().length > 50) saveToHistory();
+  const key = getHistoryKey(getProj(), _selWeek);
+  let h = [];
+  try { h = JSON.parse(localStorage.getItem(key) || '[]'); } catch(e) {}
+  if (!h[idx]) return;
+  generated = h[idx].content;
+  const outArea = document.getElementById('outArea');
+  outArea.innerHTML = `<textarea class="out-edit" id="oe" oninput="handleOutputInput(this.value)">${esc(generated)}</textarea>`;
+  document.getElementById('actionRow').style.display = 'flex';
+  document.getElementById('outMeta').textContent = generated.length + ' 字 · 历史版本';
+  scheduleDraftSave();
+  renderHistoryTabs();
+}
+
 async function startGen() {
   const proj     = getProj();
   const week     = _selWeek;
@@ -357,6 +527,9 @@ async function startGen() {
   const progress = document.getElementById('progressInput').value.trim();
   if (!proj) { alert('请选择或输入项目名称'); return; }
   if (!week) { alert('请选择周次'); return; }
+
+  // Auto-save current to history before overwriting
+  if (generated && generated.trim().length > 50) saveToHistory();
 
   const fd = new FormData();
   fd.append('project',   proj);
@@ -368,7 +541,12 @@ async function startGen() {
   fd.append('progress',  progress);
   files.forEach(f => fd.append('files', f));
 
-  document.getElementById('genBtn').disabled = true;
+  if (abortController) abortController.abort();
+  abortController = new AbortController();
+
+  document.getElementById('genBtn').style.display = 'none';
+  const cancelBtn = document.getElementById('cancelGenBtn');
+  if (cancelBtn) cancelBtn.style.display = 'block';
   document.getElementById('progBar').style.display = 'flex';
   const st2 = document.getElementById('pushStatus');
   if (st2) { st2.className = 'push-status'; st2.style.display = 'none'; }
@@ -379,7 +557,7 @@ async function startGen() {
   generated = '';
 
   try {
-    const resp = await fetch('/api/generate', { method: 'POST', body: fd });
+    const resp = await fetch('/api/generate', { method: 'POST', body: fd, signal: abortController.signal });
     const reader = resp.body.getReader(), dec = new TextDecoder();
     let buf = '';
     while (true) {
@@ -394,14 +572,18 @@ async function startGen() {
           if (msg.error) {
             sb.textContent = '⚠ 生成失败：' + msg.error;
             document.getElementById('progBar').style.display = 'none';
-            document.getElementById('genBtn').disabled = false;
+            document.getElementById('genBtn').style.display = 'block';
+            if (cancelBtn) cancelBtn.style.display = 'none';
+            abortController = null;
             return;
           }
           if (msg.status) { sb.textContent = msg.status; continue; }
           if (msg.text) { if (!generated) sb.textContent = ''; generated += msg.text; sb.textContent = generated; }
           if (msg.done) {
             document.getElementById('progBar').style.display = 'none';
-            document.getElementById('genBtn').disabled = false;
+            document.getElementById('genBtn').style.display = 'block';
+            if (cancelBtn) cancelBtn.style.display = 'none';
+            abortController = null;
             document.getElementById('actionRow').style.display = 'flex';
             document.getElementById('outMeta').textContent =
               generated.length + ' 字 · ' + new Date().toLocaleTimeString('zh-CN');
@@ -409,14 +591,28 @@ async function startGen() {
               `<textarea class="out-edit" id="oe"
                 oninput="handleOutputInput(this.value)">${esc(generated)}</textarea>`;
             scheduleDraftSave();
+            saveToHistory();
           }
         } catch(e2) {}
       }
     }
   } catch(e) {
-    sb.textContent = '⚠ 请求失败：' + e.message;
+    if (e.name === 'AbortError') {
+      sb.textContent = '生成已取消';
+      if (generated) saveToHistory();
+    } else {
+      sb.textContent = '⚠ 请求失败：' + e.message;
+    }
     document.getElementById('progBar').style.display = 'none';
-    document.getElementById('genBtn').disabled = false;
+    document.getElementById('genBtn').style.display = 'block';
+    if (cancelBtn) cancelBtn.style.display = 'none';
+    abortController = null;
+  }
+}
+
+function cancelGen() {
+  if (abortController) abortController.abort();
+}
   }
 }
 
@@ -484,29 +680,20 @@ async function sendPush(force) {
       const stageTxt = res.stage ? ' · 阶段 → ' + res.stage : '';
       const scoreTxt = scoreLabel(res.score || score) ? ' · 评分 → ' + scoreLabel(res.score || score) : '';
       const overwriteTxt = res.overwritten ? ' · 已覆盖原内容' : '';
-      const regenTxt = res.regen_ok
-        ? '<br><span style="opacity:.7;font-size:9px;">看板已重新生成 — <a href="/dashboard" target="_blank" style="color:inherit">刷新查看 →</a></span>'
-        : '<br><span style="opacity:.7;font-size:9px;">看板重新生成失败：' + esc(res.regen_msg || '未返回具体原因') + '</span>';
-      st.innerHTML = '✓ 已写入 · 项目：' + esc(proj) + newBadge + stageTxt + scoreTxt + overwriteTxt + ' · 周次：' + esc(week) + regenTxt;
-      // 粒子特效
-      const rect2 = st.getBoundingClientRect();
-      const pcx = rect2.left + rect2.width * .5;
-      const pcy = rect2.top + rect2.height * .5;
-      ['✦','◆','▲','●','★','◉','✚','◈'].forEach((ch, i) => {
-        const p = document.createElement('span');
-        const tx = ((i%2?1:-1)*(28 + Math.random()*70)).toFixed(1)+'px';
-        const ty = (-(45 + Math.random()*90)).toFixed(1)+'px';
-        const tr = (Math.random()*360).toFixed(0)+'deg';
-        p.textContent = ch;
-        p.style.cssText = 'position:fixed;pointer-events:none;z-index:9999;font-size:'
-          +(11+i%4*3)+'px;left:'+(pcx+(i-3.5)*22)+'px;top:'+pcy+'px;'
-          +'color:'+['var(--amber)','var(--green)','var(--text2)'][i%3]+';'
-          +'animation:confetti-fly .95s ease-out '+(i*55)+'ms both;'
-          +'--tx:'+tx+';--ty:'+ty+';--tr:'+tr+';';
-        document.body.appendChild(p);
-        setTimeout(()=>p.remove(), 1600);
-      });
-      setTimeout(()=>location.reload(), 2200);
+      st.innerHTML = '✓ 已推送 · 项目：' + esc(proj) + newBadge + stageTxt + scoreTxt + overwriteTxt + ' · 周次：' + esc(week);
+      // Clear form but keep project, no page refresh
+      document.getElementById('progressInput').value = '';
+      document.getElementById('extraInput').value = '';
+      document.getElementById('scoreSelect').value = '';
+      setStage('');
+      document.getElementById('outArea').innerHTML = '<textarea class="out-edit" id="oe" placeholder="在此输入本周进展，或点击「生成周报内容」由 AI 生成后在此编辑" oninput="handleOutputInput(this.value)"></textarea>';
+      document.getElementById('actionRow').style.display = 'none';
+      document.getElementById('outMeta').textContent = '';
+      generated = '';
+      files = [];
+      renderFiles();
+      showToast('✓ 已推送到看板', 'success');
+      document.getElementById('pushBtn').disabled = false;
     } else {
       st.className = 'push-status push-err';
       st.textContent = '✗ 推送失败：' + (res.error || '未知错误');
@@ -527,3 +714,70 @@ loadFieldOptions();
   if (el) el.addEventListener('change', scheduleDraftSave);
 });
 window.addEventListener('beforeunload', saveDraftNow);
+
+// ── Toast 通知 ─────────────────────────────────────────────────────────────────
+function showToast(msg, type) {
+  const e = document.querySelector('.reporter-toast');
+  if (e) e.remove();
+  const t = document.createElement('div');
+  t.className = 'reporter-toast ' + (type||'');
+  t.textContent = msg;
+  t.style.cssText = 'position:fixed;bottom:40px;right:40px;z-index:9999;padding:12px 24px;border-radius:8px;font-family:Georgia,serif;font-size:13px;color:#fff;background:'+(type==='success'?'var(--green)':'var(--red)')+';box-shadow:0 4px 16px rgba(0,0,0,.2);animation:fadeInUp .3s ease-out';
+  document.body.appendChild(t);
+  setTimeout(() => { t.style.opacity='0'; t.style.transition='opacity .3s';
+    setTimeout(() => t.remove(), 300); }, 3000);
+}
+
+// ── 队列模式 ───────────────────────────────────────────────────────────────────
+let queueMode = false;
+let projectQueue = [];
+function toggleQueueMode() {
+  queueMode = document.getElementById('queueModeCheck').checked;
+  localStorage.setItem('reporter-queue-mode', queueMode?'1':'0');
+}
+function addToQueue(proj, wk) {
+  if (projectQueue.find(q => q.project===proj && q.week===wk)) return;
+  projectQueue.push({project:proj, week:wk, status:'pending'});
+  renderQueue();
+}
+function removeFromQueue(i) { projectQueue.splice(i,1); renderQueue(); }
+function clearQueue() { projectQueue=[]; renderQueue(); }
+function renderQueue() {
+  const p = document.getElementById('queuePanel');
+  const l = document.getElementById('queueList');
+  const t = document.getElementById('queueTotal');
+  const c = document.getElementById('queueCount');
+  if (!p) return;
+  if (projectQueue.length === 0) { p.style.display='none'; if(c)c.style.display='none'; return; }
+  p.style.display='block'; if(c){c.style.display='inline';c.textContent=projectQueue.length;}
+  if(t) t.textContent = projectQueue.length;
+  l.innerHTML = projectQueue.map((q,i) =>
+    `<div class="queue-item${q.status==='done'?' done':''}${q.status==='error'?' error':''}">
+      <span class="queue-idx">${i+1}</span>
+      <span class="queue-proj">${esc(q.project)}</span>
+      <span class="queue-week">${esc(q.week)}</span>
+      <span class="queue-status">${q.status==='pending'?'等待中':q.status==='generating'?'生成中…':q.status==='done'?'✓ 完成':'✗ 失败'}</span>
+      ${q.status==='pending'?`<button class="queue-rm" onclick="removeFromQueue(${i})">移除</button>`:''}
+    </div>`).join('');
+}
+
+// ── 键盘快捷键 ───────────────────────────────────────────────
+document.addEventListener('keydown', function(e) {
+  // 只在 reporter 页面生效
+  if (!document.getElementById('genBtn')) return;
+  // 不在输入框中生效（textarea/input）
+  if (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT') return;
+
+  if (e.ctrlKey && e.key === 'Enter') {
+    e.preventDefault();
+    if (e.shiftKey) { pushDash(); }
+    else { startGen(); }
+  }
+  if (e.ctrlKey && e.shiftKey && e.key === 'C') {
+    e.preventDefault();
+    copyOut();
+  }
+  if (e.key === 'Escape') {
+    if (abortController) cancelGen();
+  }
+});

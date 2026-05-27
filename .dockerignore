@@ -1,0 +1,38 @@
+# 数据文件（通过 volume 挂载）
+*.db
+*.xlsx
+backups/
+logs/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# 环境变量（含密钥）
+.env
+.env.*
+
+# 系统文件
+.DS_Store
+*.pid
+.server.pid
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# Git
+.git/
+.gitignore
+
+# 生成文件
+dashboard.html
+.summaries_cache.json
+.excel.lock
+
+# 桌面快捷方式
+战投工作台.app/

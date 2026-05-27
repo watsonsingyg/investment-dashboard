@@ -1,0 +1,121 @@
+{% extends "_base.html" %}
+{% block title %}Pipeline · 用户管理{% endblock %}
+{% block extra_css %}
+<style>
+.admin-page { max-width: 960px; margin: 0 auto; padding: 0 24px 80px; }
+.admin-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+tr.me { background: var(--amber-bg); }
+tr.inactive { opacity: 0.4; }
+.role-badge { display: inline-block; padding: 3px 10px; border-radius: 6px; font-size: 11px; font-weight: 600; }
+.role-admin { background: var(--amber-bg); color: var(--amber); }
+.role-member { background: var(--bg2); color: var(--text2); }
+.role-viewer { background: var(--bg2); color: var(--text3); }
+.status-indicator { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; }
+.status-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; }
+.status-dot.green { background: var(--green); }
+.status-dot.gray { background: var(--text3); }
+.modal-box.admin-modal { max-width: 420px; padding: 32px 28px 28px; }
+.admin-modal h3 { font-size: 18px; font-weight: 700; margin-bottom: 20px; }
+.admin-modal .modal-actions { display: flex; gap: 8px; margin-top: 20px; }
+@media (max-width: 640px) { .admin-page { padding: 0 16px 60px; } .admin-toolbar { flex-direction: column; gap: 12px; align-items: flex-start; } .table-shell { overflow-x: auto; } .data-table { min-width: 700px; } }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="admin-page">
+  <div class="page-header">
+    <div class="page-header-label">Administration</div>
+    <h1>用户管理</h1>
+    <div class="page-header-meta"><a href="/" style="color:var(--text3);text-decoration:none">← 返回工作台</a></div>
+  </div>
+
+  <div class="admin-toolbar">
+    <span style="font-size:13px;color:var(--text3);font-weight:500" id="userCount"></span>
+    <button class="btn btn-primary" onclick="openCreateModal()">+ 新建用户</button>
+  </div>
+
+  <div class="table-shell">
+    <table class="data-table">
+      <thead><tr><th>姓名</th><th>邮箱</th><th>角色</th><th>状态</th><th>最后登录</th><th>操作</th></tr></thead>
+      <tbody id="userTable"></tbody>
+    </table>
+  </div>
+</div>
+
+<div class="modal-overlay" id="createModal">
+  <div class="modal-box admin-modal">
+    <button class="modal-close" onclick="closeModal('createModal')">✕</button>
+    <h3>新建用户</h3>
+    <div class="field"><label>姓名</label><input type="text" id="cName" placeholder="用户姓名"></div>
+    <div class="field"><label>邮箱</label><input type="email" id="cEmail" placeholder="user@example.com"></div>
+    <div class="field"><label>密码</label><input type="password" id="cPassword" placeholder="至少6位"></div>
+    <div class="field"><label>角色</label><select id="cRole"><option value="member">成员 (member)</option><option value="admin">管理员 (admin)</option><option value="viewer">只读 (viewer)</option></select></div>
+    <div class="modal-actions"><button class="btn btn-primary" onclick="doCreate()">创建</button><button class="btn btn-secondary" onclick="closeModal('createModal')">取消</button></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="resetModal">
+  <div class="modal-box admin-modal">
+    <button class="modal-close" onclick="closeModal('resetModal')">✕</button>
+    <h3>重置密码</h3>
+    <p style="font-size:13px;color:var(--text2);margin-bottom:16px" id="resetUserInfo"></p>
+    <div class="field"><label>新密码</label><input type="password" id="resetPassword" placeholder="至少6位"></div>
+    <div class="modal-actions"><button class="btn btn-primary" onclick="doReset()">确认重置</button><button class="btn btn-secondary" onclick="closeModal('resetModal')">取消</button></div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+let currentUserId = null;
+let _users = [];
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+function toast(msg, ok) {
+  showToast(msg, ok ? 'success' : 'error');
+}
+function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+async function loadUsers() {
+  const r = await fetch('/api/admin/users');
+  _users = await r.json();
+  document.getElementById('userCount').textContent = _users.length + ' 位用户';
+  let meId = null;
+  try { const mr = await fetch('/api/auth/me'); meId = (await mr.json()).user.id; } catch(e) {}
+  const tbody = document.getElementById('userTable');
+  tbody.innerHTML = _users.map(u => '<tr class="'+(meId===u.id?'me':'')+' '+(u.is_active?'':'inactive')+'"><td style="font-weight:600">'+esc(u.display_name||'—')+(meId===u.id?' <span style="font-size:11px;color:var(--text3);font-weight:400">(你)</span>':'')+'</td><td>'+esc(u.email)+'</td><td><span class="role-badge '+(u.role==='admin'?'role-admin':u.role==='viewer'?'role-viewer':'role-member')+'">'+u.role+'</span>'+(meId===u.id?'':'<select style="font-size:11px;margin-left:4px;padding:2px 4px;border:1px solid var(--border2);border-radius:4px" onchange="changeRole('+u.id+',this.value)"><option value="admin"'+(u.role==='admin'?' selected':'')+'>admin</option><option value="member"'+(u.role==='member'?' selected':'')+'>member</option><option value="viewer"'+(u.role==='viewer'?' selected':'')+'>viewer</option></select>')+'</td><td><span class="status-indicator"><span class="status-dot '+(u.is_active?'green':'gray')+'"></span>'+(u.is_active?'启用':'禁用')+'</span>'+(meId===u.id?'':'<button class="btn btn-sm '+(u.is_active?'btn-danger':'btn-primary')+'" style="margin-left:8px" onclick="toggleActive('+u.id+','+!u.is_active+')">'+(u.is_active?'禁用':'启用')+'</button>')+'</td><td style="font-size:12px;color:var(--text3)">'+(u.last_login_at?new Date(u.last_login_at).toLocaleString('zh-CN',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}):'从未登录')+'</td><td><button class="btn btn-sm btn-secondary" onclick="openResetModal('+u.id+')">重置密码</button></td></tr>').join('');
+}
+async function changeRole(id, role) {
+  const r = await fetch('/api/admin/users/'+id, {method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({role})});
+  const d = await r.json();
+  toast(d.ok ? '角色已更新' : (d.error||'失败'), d.ok);
+  loadUsers();
+}
+async function toggleActive(id, active) {
+  const r = await fetch('/api/admin/users/'+id, {method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({is_active:active})});
+  const d = await r.json();
+  toast(d.ok ? (active?'已启用':'已禁用') : (d.error||'失败'), d.ok);
+  loadUsers();
+}
+function openResetModal(id) { currentUserId = id; const u = _users.find(x => x.id === id); document.getElementById('resetUserInfo').textContent = u ? (u.display_name||u.email) : ''; document.getElementById('resetPassword').value = ''; document.getElementById('resetModal').classList.add('open'); }
+async function doReset() {
+  const pw = document.getElementById('resetPassword').value.trim();
+  if (pw.length < 6) { toast('密码至少6位', false); return; }
+  const r = await fetch('/api/admin/users/'+currentUserId, {method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({reset_password:pw})});
+  const d = await r.json();
+  if (d.ok) { toast('密码已重置', true); closeModal('resetModal'); } else toast(d.error||'失败', false);
+}
+function openCreateModal() { document.getElementById('createModal').classList.add('open'); }
+async function doCreate() {
+  const name = document.getElementById('cName').value.trim();
+  const email = document.getElementById('cEmail').value.trim();
+  const password = document.getElementById('cPassword').value.trim();
+  const role = document.getElementById('cRole').value;
+  if (!email.includes('@')) { toast('请输入有效邮箱', false); return; }
+  if (password.length < 6) { toast('密码至少6位', false); return; }
+  const r = await fetch('/api/admin/users', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({display_name:name,email,password,role})});
+  const d = await r.json();
+  if (d.ok) { toast('用户已创建', true); closeModal('createModal'); loadUsers(); }
+  else toast(d.error||'创建失败', false);
+}
+loadUsers();
+</script>
+{% endblock %}

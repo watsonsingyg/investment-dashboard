@@ -1,0 +1,114 @@
+{% extends "_base.html" %}
+{% block title %}Pipeline · 系统设置{% endblock %}
+{% block extra_css %}
+<style>
+.settings-page { max-width: 700px; margin: 0 auto; padding: 0 24px 80px; }
+.settings-section { background: var(--bg3); border: 1px solid var(--border); border-radius: var(--r2); padding: 28px; margin-bottom: 18px; box-shadow: var(--shadow-sm); }
+.settings-section h2 { font-size: 16px; font-weight: 700; margin-bottom: 4px; }
+.settings-section .desc { font-size: 12px; color: var(--text3); margin-bottom: 20px; }
+.settings-actions { display: flex; gap: 10px; margin-top: 18px; }
+.status-row { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--text2); font-weight: 500; }
+.status-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.status-dot.green { background: var(--green); box-shadow: 0 0 0 3px var(--green-bg); }
+.status-dot.gray { background: var(--text3); box-shadow: 0 0 0 3px var(--bg2); }
+.settings-note { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border); font-size: 11px; color: var(--text3); line-height: 1.7; }
+@media (max-width: 640px) { .settings-page { padding: 0 16px 60px; } .settings-section { padding: 22px 20px; } }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="settings-page">
+  <div class="page-header">
+    <div class="page-header-label">Pipeline · Configuration</div>
+    <h1>系统设置</h1>
+    <div class="page-header-meta"><a href="/" style="color:var(--text3);text-decoration:none">← 返回工作台</a></div>
+  </div>
+
+  <div class="settings-section">
+    <h2>AI 服务配置</h2>
+    <div class="desc">所有 API Key 经 AES-256 加密后存储在本地数据库</div>
+    <div class="field"><label>服务商</label><select id="provider" onchange="onProviderChange()"><option value="deepseek">DeepSeek</option><option value="openai">OpenAI</option><option value="anthropic">Anthropic (Claude)</option></select></div>
+    <div class="field"><label>API Key</label><input type="password" id="apiKey" placeholder="sk-..."></div>
+    <div class="field"><label>API Base URL（可选）</label><input type="text" id="apiBaseUrl" placeholder="https://api.deepseek.com"></div>
+    <div class="field"><label>模型</label><input type="text" id="model" placeholder="deepseek-v4-pro"></div>
+    <div class="settings-actions"><button class="btn btn-primary" onclick="saveConfig()">保存配置</button><button class="btn btn-secondary" onclick="testConnection()">测试连接</button></div>
+    <div class="notice" id="testResult"></div>
+  </div>
+
+  <div class="settings-section">
+    <h2>搜索增强（可选）</h2>
+    <div class="desc">Tavily 联网检索，提升周报信息量</div>
+    <div class="field"><label>Tavily API Key</label><input type="password" id="tavilyKey" placeholder="tvly-..."></div>
+    <div class="settings-actions"><button class="btn btn-primary" onclick="saveConfig()">保存配置</button></div>
+    <div class="notice" id="saveResult"></div>
+  </div>
+
+  <div class="settings-section">
+    <h2>当前状态</h2>
+    <div class="status-row"><span class="status-dot gray" id="statusDot"></span><span id="statusText">未配置</span></div>
+    <div class="settings-note">Key 使用 AES-256-GCM 加密存储，仅本机可解密。<br>若服务器重启且 JWT_SECRET 变化，需要重新输入 API Key。</div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+const DEFAULTS = {
+  deepseek:  { url: 'https://api.deepseek.com',  model: 'deepseek-v4-pro' },
+  openai:    { url: 'https://api.openai.com',     model: 'gpt-4o' },
+  anthropic: { url: 'https://api.anthropic.com',  model: 'claude-sonnet-4-20250514' },
+};
+function onProviderChange() {
+  const p = document.getElementById('provider').value;
+  const d = DEFAULTS[p];
+  if (!document.getElementById('apiBaseUrl').value) document.getElementById('apiBaseUrl').placeholder = d.url;
+  if (!document.getElementById('model').value) document.getElementById('model').placeholder = d.model;
+}
+async function loadConfig() {
+  try {
+    const r = await fetch('/api/settings/ai-config');
+    const d = await r.json();
+    document.getElementById('provider').value = d.provider || 'deepseek';
+    document.getElementById('apiBaseUrl').value = d.api_base_url || '';
+    document.getElementById('model').value = d.model || '';
+    onProviderChange();
+    if (d.is_configured) {
+      document.getElementById('statusDot').className = 'status-dot green';
+      document.getElementById('statusText').textContent = '已配置 (' + (d.provider||'deepseek') + ')';
+    }
+  } catch(e) {}
+}
+async function saveConfig() {
+  const fd = new FormData();
+  fd.append('provider', document.getElementById('provider').value);
+  fd.append('api_key', document.getElementById('apiKey').value);
+  fd.append('api_base_url', document.getElementById('apiBaseUrl').value);
+  fd.append('model', document.getElementById('model').value);
+  fd.append('tavily_api_key', document.getElementById('tavilyKey').value);
+  const el = document.getElementById('saveResult');
+  try {
+    const r = await fetch('/api/settings/ai-config', { method:'POST',body:fd });
+    const d = await r.json();
+    if (d.ok) {
+      el.className = 'notice notice-success show';
+      el.textContent = '配置已保存并加密存储';
+      document.getElementById('statusDot').className = 'status-dot green';
+      document.getElementById('statusText').textContent = '已配置 (' + d.config.provider + ')';
+      document.getElementById('apiKey').value = '';
+      document.getElementById('tavilyKey').value = '';
+    } else { el.className = 'notice notice-error show'; el.textContent = (d.error || '保存失败'); }
+  } catch(e) { el.className = 'notice notice-error show'; el.textContent = '网络错误'; }
+}
+async function testConnection() {
+  const el = document.getElementById('testResult');
+  el.className = 'notice notice-info show'; el.textContent = '测试中…';
+  try {
+    const r = await fetch('/api/settings/test-connection', { method:'POST' });
+    const d = await r.json();
+    if (d.ok) { el.className = 'notice notice-success show'; el.textContent = '连接成功'; }
+    else { el.className = 'notice notice-error show'; el.textContent = (d.error || '连接失败'); }
+  } catch(e) { el.className = 'notice notice-error show'; el.textContent = '网络错误'; }
+}
+loadConfig();
+</script>
+{% endblock %}

@@ -1,127 +1,197 @@
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>战投工作台</title>
+{% extends "_base.html" %}
+{% block title %}Pipeline · 工作台{% endblock %}
+{% block extra_css %}
 <style>
-:root{
-  --bg:#faf9f7;--bg2:#f2f0eb;--bg3:#ffffff;
-  --border:rgba(0,0,0,.08);--border2:rgba(0,0,0,.14);
-  --text:#1a1a18;--text2:#5c5b55;--text3:#8e8d86;
-  --amber:#b87316;--amber-bg:#fef3e0;
-  --r:8px;--r2:12px
+.portal-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 18px;
 }
-*{box-sizing:border-box;margin:0;padding:0}
-body{font-family:'Georgia','Noto Serif SC',serif;background:var(--bg);color:var(--text);min-height:100vh}
-.page{max-width:1180px;margin:0 auto;padding:48px 40px 80px}
-
-.masthead{border-bottom:1.5px solid var(--text);padding-bottom:20px;margin-bottom:48px}
-.masthead-label{font-family:'Courier New',monospace;font-size:10px;letter-spacing:.14em;
-  color:var(--text3);text-transform:uppercase;margin-bottom:8px}
-h1{font-size:28px;font-weight:normal;letter-spacing:-.5px}
-.masthead-meta{margin-top:8px;font-family:'Courier New',monospace;font-size:10px;color:var(--text3);
-  display:flex;gap:24px}
-
-.portal-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:18px}
-.portal-card{display:block;padding:36px 32px 52px;background:var(--bg3);
-  border:.5px solid var(--border2);border-radius:var(--r2);text-decoration:none;
-  color:var(--text);transition:border-color .18s,box-shadow .18s;position:relative;min-height:240px}
-.portal-card:hover{border-color:var(--text);box-shadow:0 4px 24px rgba(0,0,0,.06)}
-.card-tag{font-family:'Courier New',monospace;font-size:9px;letter-spacing:.16em;
-  color:var(--text3);text-transform:uppercase;margin-bottom:20px}
-.card-title{font-size:22px;font-weight:normal;margin-bottom:14px;letter-spacing:-.3px}
-.card-desc{font-size:13px;color:var(--text2);line-height:1.85}
-.card-stat{margin-top:16px;padding-top:14px;border-top:.5px solid var(--border);
-  font-family:'Courier New',monospace;font-size:10px;color:var(--text3);line-height:1.7}
-.card-arrow{position:absolute;bottom:26px;right:30px;
-  font-family:'Courier New',monospace;font-size:11px;letter-spacing:.06em;
-  color:var(--text3);transition:color .15s}
-.portal-card:hover .card-arrow{color:var(--text)}
-
-.logout{position:fixed;top:22px;right:32px;font-family:'Courier New',monospace;
-  font-size:10px;color:var(--text3);text-decoration:none;letter-spacing:.06em;
-  border-bottom:.5px solid transparent}
-.logout:hover{color:var(--text);border-color:var(--text3)}
-@media(max-width:1120px){.portal-grid{grid-template-columns:1fr 1fr}.page{max-width:920px}}
-@media(max-width:640px){.page{padding:38px 20px 64px}.portal-grid{grid-template-columns:1fr}.portal-card{min-height:210px}.masthead-meta{gap:12px}}
+.portal-card {
+  display: flex;
+  flex-direction: column;
+  padding: 32px 28px 52px;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: var(--r3);
+  text-decoration: none;
+  color: var(--text);
+  box-shadow: var(--shadow-sm);
+  transition: all var(--ease);
+  position: relative;
+  min-height: 260px;
+  overflow: hidden;
+}
+.portal-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--amber), transparent);
+  opacity: 0;
+  transition: opacity var(--ease);
+}
+.portal-card:hover {
+  box-shadow: var(--shadow-lg);
+  border-color: var(--amber-border);
+  transform: translateY(-2px);
+}
+.portal-card:hover::before { opacity: 1; }
+.portal-card:nth-child(2)::before { background: linear-gradient(90deg, #2563EB, transparent); }
+.portal-card:nth-child(3)::before { background: linear-gradient(90deg, #059669, transparent); }
+.portal-card:nth-child(4)::before { background: linear-gradient(90deg, #7C3AED, transparent); }
+.portal-card:nth-child(5)::before { background: linear-gradient(90deg, #D97706, transparent); }
+.portal-card:nth-child(6)::before { background: linear-gradient(90deg, #E11D48, transparent); }
+.card-tag {
+  font-size: 10px; font-weight: 700; letter-spacing: 0.10em;
+  text-transform: uppercase; color: var(--amber); margin-bottom: 18px;
+}
+.portal-card:nth-child(2) .card-tag { color: #2563EB; }
+.portal-card:nth-child(3) .card-tag { color: #059669; }
+.portal-card:nth-child(4) .card-tag { color: #7C3AED; }
+.portal-card:nth-child(5) .card-tag { color: #D97706; }
+.portal-card:nth-child(6) .card-tag { color: #E11D48; }
+.card-title {
+  font-size: 20px; font-weight: 700; letter-spacing: -0.01em;
+  margin-bottom: 12px; line-height: 1.3;
+}
+.card-desc { font-size: 13px; color: var(--text2); line-height: 1.75; flex: 1; }
+.card-stat {
+  margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border);
+  font-size: 11px; color: var(--text3); line-height: 1.7;
+}
+.card-arrow {
+  position: absolute; bottom: 24px; right: 28px;
+  width: 34px; height: 34px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 50%; background: var(--bg2); color: var(--text3);
+  font-size: 14px; transition: all var(--ease);
+}
+.portal-card:hover .card-arrow {
+  background: var(--text); color: #fff; transform: translateX(2px);
+}
+.setup-banner { margin-bottom: 28px; }
+.setup-banner-inner {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 14px 20px; background: var(--amber-bg);
+  border: 1px solid var(--amber-border); border-radius: var(--r2);
+  font-size: 13px; font-weight: 500; color: var(--amber);
+}
+.setup-banner-link {
+  color: var(--amber); font-weight: 700; text-decoration: none;
+  white-space: nowrap; margin-left: 16px; padding: 6px 14px;
+  border: 1px solid var(--amber-border); border-radius: var(--r);
+  transition: all var(--ease);
+}
+.setup-banner-link:hover { background: var(--amber); color: #fff; }
+@media (max-width: 1200px) { .portal-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 768px) {
+  .portal-grid { grid-template-columns: 1fr; }
+  .portal-card { min-height: 220px; padding: 28px 24px 48px; }
+  .card-title { font-size: 18px; }
+  .setup-banner-inner { flex-direction: column; gap: 10px; text-align: center; }
+}
 </style>
-</head>
-<body>
-<a href="/logout" class="logout">退出 ×</a>
-<div class="page">
+{% endblock %}
 
-<div class="masthead">
-  <div class="masthead-label">战投 · 投资管理平台</div>
-  <h1>工作台</h1>
-  <div class="masthead-meta">
-    <span>{{PROJECT_COUNT}} 个项目</span>
-    <span>看板更新：{{LAST_UPDATED}}</span>
+{% block content %}
+<div class="page">
+  <div class="page-header">
+    <div class="page-header-label">Strategic Investment · Pipeline Management</div>
+    <h1>工作台</h1>
+    <div class="page-header-meta">
+      <span>{{ project_count }} 个投资项目</span>
+      <span>·</span>
+      <span>看板更新：{{ last_updated }}</span>
+      <span>·</span>
+      <span>生成模型：{{ generation_model }}</span>
+    </div>
+  </div>
+
+  <div class="setup-banner" id="setupBanner" style="display:none">
+    <div class="setup-banner-inner">
+      <span>AI 服务尚未配置，周报生成功能暂不可用</span>
+      <a href="/settings" class="setup-banner-link">立即配置 →</a>
+    </div>
+  </div>
+
+  <div class="portal-grid">
+    <a href="/dashboard" class="portal-card">
+      <div class="card-tag">Pipeline Dashboard</div>
+      <div class="card-title">投资 Pipeline 看板</div>
+      <div class="card-desc">
+        全项目状态追踪与漏斗分析<br>
+        行业大类分布 · 本周活跃动态<br>
+        时间轴详情 · AI 进展摘要
+      </div>
+      <div class="card-stat">{{ project_count }} 个项目 · 更新于 {{ last_updated }}</div>
+      <div class="card-arrow">→</div>
+    </a>
+    <a href="/reporter" class="portal-card">
+      <div class="card-tag">Weekly Reporter</div>
+      <div class="card-title">周报生成器</div>
+      <div class="card-desc">
+        上传 BP / 会议纪要 / 财报<br>
+        AI 生成周报条目并推送至看板<br>
+        新项目入库 · 阶段状态更新
+      </div>
+      <div class="card-stat">investment-taste · yuhan-writing-style<br>Model: {{ generation_model }}</div>
+      <div class="card-arrow">→</div>
+    </a>
+    <a href="/governance" class="portal-card">
+      <div class="card-tag">Data Governance</div>
+      <div class="card-title">数据治理</div>
+      <div class="card-desc">
+        缺负责人 / 缺优先级 / 缺状态<br>
+        长期无更新 · 异常周次 · 疑似重复<br>
+        问题筛选 · 人工确认后修正
+      </div>
+      <div class="card-stat">使用现有 Excel 解析结果<br>不自动改动数据源</div>
+      <div class="card-arrow">→</div>
+    </a>
+    <a href="/status" class="portal-card">
+      <div class="card-tag">Runtime Status</div>
+      <div class="card-title">运行状态</div>
+      <div class="card-desc">
+        当前 PID / 启动时间 / 运行时长<br>
+        模型配置 · Excel 修改时间<br>
+        服务日志尾部 · 排查启动问题
+      </div>
+      <div class="card-stat">只读诊断页面<br>不提供网页重启或杀进程</div>
+      <div class="card-arrow">→</div>
+    </a>
+    <a href="/settings" class="portal-card">
+      <div class="card-tag">Configuration</div>
+      <div class="card-title">系统设置</div>
+      <div class="card-desc">
+        AI 服务提供商配置<br>
+        API Key 管理 · 模型选择<br>
+        搜索增强设置
+      </div>
+      <div class="card-stat">本地加密存储 · 仅本机访问</div>
+      <div class="card-arrow">→</div>
+    </a>
+    <a href="/admin/users" class="portal-card">
+      <div class="card-tag">Administration</div>
+      <div class="card-title">用户管理</div>
+      <div class="card-desc">
+        团队成员账号管理<br>
+        角色分配 · 创建用户<br>
+        重置密码 · 启用/禁用
+      </div>
+      <div class="card-stat">Admin 专属 · 团队协作必备</div>
+      <div class="card-arrow">→</div>
+    </a>
   </div>
 </div>
+{% endblock %}
 
-<div class="portal-grid">
-
-  <a href="/dashboard" class="portal-card" target="_blank" rel="noopener">
-    <div class="card-tag">Pipeline Dashboard</div>
-    <div class="card-title">投资 Pipeline 看板</div>
-    <div class="card-desc">
-      全项目状态追踪与漏斗分析<br>
-      行业大类分布 · 本周活跃动态<br>
-      时间轴详情 · AI 进展摘要
-    </div>
-    <div class="card-stat">
-      {{PROJECT_COUNT}} 个项目 · 更新于 {{LAST_UPDATED}}
-    </div>
-    <div class="card-arrow">进入看板 →</div>
-  </a>
-
-  <a href="/reporter" class="portal-card" target="_blank" rel="noopener">
-    <div class="card-tag">Weekly Reporter</div>
-    <div class="card-title">周报生成器</div>
-    <div class="card-desc">
-      上传 BP / 会议纪要 / 财报<br>
-      AI 生成周报条目并推送至看板<br>
-      新项目入库 · 阶段状态更新
-    </div>
-    <div class="card-stat">
-      investment-taste &middot; yuhan-writing-style<br>
-      Model: {{GENERATION_MODEL}}
-    </div>
-    <div class="card-arrow">进入生成器 →</div>
-  </a>
-
-  <a href="/governance" class="portal-card" target="_blank" rel="noopener">
-    <div class="card-tag">Data Governance</div>
-    <div class="card-title">数据治理 / 健康检查</div>
-    <div class="card-desc">
-      缺负责人 / 缺优先级 / 缺状态<br>
-      长期无更新 · 异常周次 · 疑似重复<br>
-      问题筛选 · 人工确认后修正
-    </div>
-    <div class="card-stat">
-      使用现有 Excel 解析结果<br>
-      不自动改动数据源
-    </div>
-    <div class="card-arrow">进入检查 →</div>
-  </a>
-
-  <a href="/status" class="portal-card" target="_blank" rel="noopener">
-    <div class="card-tag">Runtime Status</div>
-    <div class="card-title">运行状态 / 日志</div>
-    <div class="card-desc">
-      当前 PID / 启动时间 / 运行时长<br>
-      模型配置 · Excel 修改时间<br>
-      服务日志尾部 · 排查启动问题
-    </div>
-    <div class="card-stat">
-      只读诊断页面<br>
-      不提供网页重启或杀进程
-    </div>
-    <div class="card-arrow">查看状态 →</div>
-  </a>
-
-</div>
-</div>
-</body>
-</html>
+{% block extra_scripts %}
+<script>
+(function(){
+  if ('{{ ai_configured }}' === 'false') {
+    document.getElementById('setupBanner').style.display = 'block';
+  }
+})();
+</script>
+{% endblock %}
