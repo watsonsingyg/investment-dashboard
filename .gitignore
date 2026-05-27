@@ -55,3 +55,5 @@ dist/
 # 项目数据文件（仅本地保留）
 周报 database.xlsx
 *.xlsx
+venv_sys/
+railway-flask-deploy.zip

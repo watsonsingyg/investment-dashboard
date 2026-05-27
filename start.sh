@@ -9,6 +9,13 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
+# 使用虚拟环境中的 Python
+if [ -f "venv_sys/bin/python3" ]; then
+    PYTHON="$(pwd)/venv_sys/bin/python3"
+else
+    PYTHON="python3"
+fi
+
 PORT="${PORT:-8766}"
 export PORT
 HOST="127.0.0.1"
@@ -46,7 +53,7 @@ health_json() {
 }
 
 service_started_epoch() {
-  health_json | python3 -c 'import datetime,json,sys
+    health_json | $PYTHON -c 'import datetime,json,sys
 try:
     raw=sys.stdin.read().strip()
     if not raw:
@@ -59,7 +66,7 @@ except Exception:
 }
 
 newest_code_epoch() {
-  python3 - <<'PY'
+  $PYTHON - <<'PY'
 from pathlib import Path
 roots = [
     Path('start.sh'),
@@ -224,7 +231,7 @@ echo "启动投资 Pipeline 管理系统：${BASE_URL}"
 echo "日志文件：${PWD}/${LOG_FILE}"
 echo "---- $(date '+%Y-%m-%d %H:%M:%S') start ----" >> "$LOG_FILE"
 
-python3 -u server.py >> "$LOG_FILE" 2>&1 &
+$PYTHON -u server.py >> "$LOG_FILE" 2>&1 &
 APP_PID=$!
 echo "$APP_PID" > "$PID_FILE"
 

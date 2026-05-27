@@ -7,6 +7,7 @@ reporter/ — 投资 Pipeline 管理系统。
 """
 
 from flask import Flask, g
+from flask_cors import CORS  # 新增 CORS 支持
 from config import settings
 from models.base import init_db, SessionLocal
 from reporter.middleware.tenant import resolve_tenant
@@ -21,6 +22,15 @@ def create_app() -> Flask:
         SESSION_COOKIE_HTTPONLY=True,
         SESSION_COOKIE_SAMESITE="Lax",
     )
+
+    # ── CORS 配置 ──────────────────────────────────────────────────────
+    # 允许前端域名访问 API（根据需要调整）
+    # 生产环境建议明确指定允许的域名
+    CORS(app, 
+         supports_credentials=True,  # 允许携带 cookie/token
+         resources={r"/api/*": {"origins": "*"}},  # 允许所有来源访问 API
+         allow_headers=["Content-Type", "Authorization"],
+         methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"])
 
     # 初始化数据库
     init_db()

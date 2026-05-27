@@ -14,9 +14,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq5 && \
     rm -rf /var/lib/apt/lists/*
 
-# 复制依赖并安装
+# 强制重新构建（Railway Docker 缓存）
+ARG CACHEBUST=3
+
+# 复制依赖并安装（清理 pip 缓存确保重新安装）
 COPY requirements.txt .
-RUN pip install --no-cache-dir --prefer-binary -r requirements.txt
+RUN pip cache purge && \
+    pip install --no-cache-dir --prefer-binary -r requirements.txt
 
 # 复制应用代码
 COPY . .
