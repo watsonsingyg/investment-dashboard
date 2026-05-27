@@ -1,5 +1,6 @@
 # Pipeline SaaS — Railway 云部署 Dockerfile
 # 单阶段精简构建，避免 OOM
+# Build: 2026-05-27-15-12 (force rebuild)
 
 FROM python:3.11-slim
 
