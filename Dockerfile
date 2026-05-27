@@ -3,43 +3,42 @@ FROM python:3.11-slim AS builder
 
 WORKDIR /app
 
-# 安装系统依赖
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc libpq-dev && \
     rm -rf /var/lib/apt/lists/*
 
-# 安装 Python 依赖（分层缓存）
 COPY requirements.txt .
-RUN pip install --no-cache-dir --user -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
 # ── Stage 2: 运行时 ───────────────────────────────────────────────────────
 FROM python:3.11-slim
 
 WORKDIR /app
 
-# 安装运行时系统库
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq5 && \
     rm -rf /var/lib/apt/lists/*
 
-# 从 builder 复制 Python 包
-COPY --from=builder /root/.local /root/.local
-ENV PATH=/root/.local/bin:$PATH
+# 从 builder 复制全局安装的 Python 包（所有用户都能访问）
+COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
+COPY --from=builder /usr/local/bin /usr/local/bin
 
 # 复制应用代码
 COPY . .
 
-# 创建非 root 用户
-RUN useradd --create-home --shell /bin/bash pipeline && \
-    chown -R pipeline:pipeline /app
-USER pipeline
+# 入口脚本
+COPY docker-entrypoint.sh /app/docker-entrypoint.sh
+RUN chmod +x /app/docker-entrypoint.sh
 
-# 健康检查
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD python3 -c "import urllib.request; urllib.request.urlopen('http://localhost:8766/api/health')" || exit 1
+# 健康检查（使用环境变量 PORT，默认 8766）
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
+    CMD python3 -c "import os,urllib.request; port=os.environ.get('PORT','8766'); urllib.request.urlopen(f'http://localhost:{port}/api/health')" || exit 1
 
-# 暴露端口
+# 云部署：绑定所有网络接口（Railway/Render 等需要 0.0.0.0）
+ENV APP_HOST=0.0.0.0
+
+# 暴露端口（Railway 会通过 PORT 环境变量动态分配，这里仅作文档用途）
 EXPOSE 8766
 
-# 启动命令
-CMD ["python3", "-u", "server.py"]
+# 入口脚本（等待数据库 → 迁移 → 启动服务）
+ENTRYPOINT ["/app/docker-entrypoint.sh"]
